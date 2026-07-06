@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saved HTML Files</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-store.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+  <div class="max-w-5xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+    
+    <!-- Header -->
+    <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8 pb-6 border-b border-gray-200">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Saved HTML Files</h1>
+        <p class="text-gray-500 mt-2">Browse your saved pages as a polished book shelf of previews.</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href="teacher-dashboard.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+          Dashboard
+        </a>
+        <a href="html-editor.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+          Back to Editor
+        </a>
+        <a href="chapter-book-maker.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+          Open Chapter Book Maker
+        </a>
+        <a href="chapter-books.html" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+          View Chapter Books
+        </a>
+      </div>
+    </header>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden rounded-xl border-2 border-dashed border-gray-300 p-12 text-center bg-white">
+      <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      <h3 class="mt-2 text-sm font-semibold text-gray-900">No saved files yet</h3>
+      <p class="mt-1 text-sm text-gray-500">Save a preview from the editor to populate this shelf.</p>
+    </div>
+
+    <!-- List -->
+    <div id="files-list" class="flex flex-col gap-3 pb-8"></div>
+  </div>
+
+  <!-- Delete Notice -->
+  <div id="delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/40 px-4">
+    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl ring-1 ring-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Delete saved file?</h2>
+      <p class="mt-2 text-sm text-gray-600">
+        This will permanently remove <span id="delete-file-name" class="font-medium text-gray-900"></span> from your saved HTML files. Download a copy first if you might need it later.
+      </p>
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button id="btn-cancel-delete" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button id="btn-confirm-delete" class="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-500 transition-colors">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const isEmbedded = params.get("embedded") === "1";
+    const activeUser = window.DigitxtStore.getSession();
+    if (activeUser && activeUser.role === "student") {
+      window.location.href = "student-dashboard.html";
+    }
+
+    if (isEmbedded) {
+      document.querySelector("header")?.classList.add("hidden");
+    }
+
+    const list = document.getElementById("files-list");
+    const emptyState = document.getElementById("empty-state");
+    const deleteModal = document.getElementById("delete-modal");
+    const deleteFileName = document.getElementById("delete-file-name");
+    const cancelDeleteButton = document.getElementById("btn-cancel-delete");
+    const confirmDeleteButton = document.getElementById("btn-confirm-delete");
+    let pendingDeleteFile = null;
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttribute(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/\"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function formatDate(value) {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function getStoredFiles() {
+      return await window.DigitxtStore.listHtmlFiles();
+    }
+
+    function getDisplayName(entry) {
+      const metadata = entry.metadata || {};
+      return metadata.title || entry.name || "Untitled";
+    }
+
+    function showFileSkeletons() {
+      emptyState.classList.add("hidden");
+      list.innerHTML = Array.from({ length: 5 }).map(() => `
+        <article class="flex flex-col justify-between gap-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+          <div class="w-full">
+            <div class="h-5 w-2/3 animate-pulse rounded bg-gray-200"></div>
+            <div class="mt-3 h-4 w-full max-w-md animate-pulse rounded bg-gray-100"></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="h-9 w-16 animate-pulse rounded-md bg-gray-100"></div>
+            <div class="h-9 w-24 animate-pulse rounded-md bg-gray-100"></div>
+            <div class="h-9 w-16 animate-pulse rounded-md bg-gray-100"></div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function showDeleteNotice(entry) {
+      pendingDeleteFile = entry;
+      deleteFileName.textContent = getDisplayName(entry);
+      deleteModal.classList.remove("hidden");
+      deleteModal.classList.add("flex");
+      confirmDeleteButton.focus();
+    }
+
+    function hideDeleteNotice() {
+      pendingDeleteFile = null;
+      deleteModal.classList.add("hidden");
+      deleteModal.classList.remove("flex");
+      confirmDeleteButton.disabled = false;
+      confirmDeleteButton.textContent = "Delete";
+    }
+
+    async function deleteSavedFile() {
+      if (!pendingDeleteFile) return;
+
+      confirmDeleteButton.disabled = true;
+      confirmDeleteButton.textContent = "Deleting...";
+
+      try {
+        await window.DigitxtStore.deleteHtmlFile(pendingDeleteFile.id);
+        hideDeleteNotice();
+        await renderFiles();
+      } catch (error) {
+        console.error("Unable to delete saved file:", error);
+        alert(`Unable to delete this saved file. ${error.message || error}`);
+        confirmDeleteButton.disabled = false;
+        confirmDeleteButton.textContent = "Delete";
+      }
+    }
+
+    function openSavedFile(entry) {
+      const payload = {
+        type: "fullPagePreview",
+        content: entry.content,
+        chapter: null,
+        htmlFileId: entry.id,
+        htmlFileName: entry.name,
+        metadata: entry.metadata || {},
+        notes: entry.metadata?.notes || "",
+        activityState: entry.metadata?.noteDocument
+          ? { notes: entry.metadata.notes || "", noteDocument: entry.metadata.noteDocument }
+          : {}
+      };
+      const token = `full-page-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const storageKey = `fullPagePreviewToken:${token}`;
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+
+      const returnTo = "saved-files.html";
+      const returnLabel = "Return to Saved Files";
+      const url = `full-page.html?token=${encodeURIComponent(token)}&returnTo=${encodeURIComponent(returnTo)}&returnLabel=${encodeURIComponent(returnLabel)}`;
+      window.top.location.href = url;
+
+      setTimeout(() => {
+        localStorage.removeItem(storageKey);
+      }, 20000);
+    }
+
+    async function renderFiles() {
+      showFileSkeletons();
+      try {
+        const savedFiles = await getStoredFiles();
+
+        if (!savedFiles.length) {
+          emptyState.classList.remove("hidden");
+          list.innerHTML = "";
+          return;
+        }
+
+        emptyState.classList.add("hidden");
+        list.innerHTML = savedFiles.map((file) => {
+          const metadata = file.metadata || {};
+          const title = escapeHtml(getDisplayName(file));
+          const author = escapeHtml(metadata.author || "Unknown author");
+          const year = escapeHtml(metadata.year || "");
+          const savedAt = escapeHtml(formatDate(file.savedAt));
+
+          return `
+            <article class="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors gap-4">
+              <div>
+                <h4 class="text-base font-semibold text-gray-900">${title}</h4>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 mt-1">
+                  <span>${author ? `by ${author}` : "Author not set"}</span>
+                  ${year ? `<span aria-hidden="true">&middot;</span><span>${year}</span>` : ""}
+                  <span aria-hidden="true">&middot;</span>
+                  <span>Saved ${savedAt}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button data-open-id="${escapeAttribute(file.id)}" class="text-sm font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-md transition-colors">Open</button>
+                <button data-download-id="${escapeAttribute(file.id)}" class="text-sm font-medium text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 px-4 py-2 rounded-md transition-colors shadow-sm">Download</button>
+                <button data-delete-id="${escapeAttribute(file.id)}" class="text-sm font-medium text-red-600 hover:text-red-500 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-md transition-colors">Delete</button>
+              </div>
+            </article>
+          `;
+        }).join("");
+
+        list.querySelectorAll("button[data-open-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = savedFiles.find((entry) => entry.id === button.getAttribute("data-open-id"));
+            if (item) {
+              openSavedFile(item);
+            }
+          });
+        });
+
+        list.querySelectorAll("button[data-download-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = savedFiles.find((entry) => entry.id === button.getAttribute("data-download-id"));
+            if (!item) return;
+
+            const blob = new Blob([item.content], { type: "text/html" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${item.name || "saved-file"}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          });
+        });
+
+        list.querySelectorAll("button[data-delete-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = savedFiles.find((entry) => entry.id === button.getAttribute("data-delete-id"));
+            if (item) {
+              showDeleteNotice(item);
+            }
+          });
+        });
+      } catch (error) {
+        console.error("Unable to load saved files:", error);
+        emptyState.classList.remove("hidden");
+        list.innerHTML = "";
+      }
+    }
+
+    cancelDeleteButton.addEventListener("click", hideDeleteNotice);
+    confirmDeleteButton.addEventListener("click", deleteSavedFile);
+    deleteModal.addEventListener("click", (event) => {
+      if (event.target === deleteModal) {
+        hideDeleteNotice();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !deleteModal.classList.contains("hidden")) {
+        hideDeleteNotice();
+      }
+    });
+
+    renderFiles();
+  </script>
+</body>
+</html>

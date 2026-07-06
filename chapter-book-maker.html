@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter Book Maker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-store.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+  <div class="max-w-5xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+    
+    <!-- Header -->
+    <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8 pb-6 border-b border-gray-200">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Chapter Book Maker</h1>
+        <p class="text-gray-500 mt-2">Pick saved pages and weave them into a polished chapter book.</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href="teacher-dashboard.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Dashboard</a>
+        <a href="html-editor.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Back to Editor</a>
+        <a href="saved-files.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">View Saved Files</a>
+        <a href="chapter-books.html" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">View Chapter Books</a>
+      </div>
+    </header>
+
+    <!-- Book Builder Section -->
+    <section class="mb-10 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+      <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between border-b border-gray-100 pb-5 mb-5">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Book Details</h2>
+          <p class="mt-1 text-sm text-gray-500">Select pages below and fill in the details to generate your book.</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <button id="clear-book-selection-btn" class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">Clear Selection</button>
+          <button id="build-book-btn" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Build Chapter Book</button>
+        </div>
+      </div>
+
+      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div class="lg:col-span-2">
+          <label for="book-maker-title" class="block text-sm font-medium leading-6 text-gray-900">Book title</label>
+          <div class="mt-2">
+            <input id="book-maker-title" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Enter a title..." />
+          </div>
+        </div>
+
+        <div>
+          <label for="book-maker-author" class="block text-sm font-medium leading-6 text-gray-900">Author</label>
+          <div class="mt-2">
+            <input id="book-maker-author" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Author name" />
+          </div>
+        </div>
+
+        <div>
+          <label for="book-maker-year" class="block text-sm font-medium leading-6 text-gray-900">Year</label>
+          <div class="mt-2">
+            <input id="book-maker-year" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="e.g. 2026" />
+          </div>
+        </div>
+
+        <div class="lg:col-span-4">
+          <label for="book-maker-cover" class="block text-sm font-medium leading-6 text-gray-900">Cover photo URL</label>
+          <div class="mt-2">
+            <input id="book-maker-cover" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Paste an image URL" />
+          </div>
+        </div>
+      </div>
+
+      <p id="book-maker-status" class="mt-5 text-sm text-gray-500 bg-gray-50 p-3 rounded-md border border-gray-100">
+        Select saved HTML pages below to add them to your chapter book.
+      </p>
+    </section>
+
+    <!-- File List Section -->
+    <section class="mt-8 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-900/5">
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h3 class="text-lg font-semibold text-gray-900">Saved HTML Files</h3>
+        <p class="mt-1 text-sm text-gray-500">All files saved from the HTML editor are listed below. Select the ones you want to add to this chapter book.</p>
+      </div>
+      <div class="flex items-center gap-4 w-full sm:w-auto">
+        <p id="saved-files-count" class="text-sm text-gray-500 whitespace-nowrap"></p>
+        <button id="select-all-files-btn" class="whitespace-nowrap rounded-md bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">Select All</button>
+        <div class="relative w-full sm:w-64">
+          <input id="saved-file-search" type="search" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Search pages..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden rounded-xl border-2 border-dashed border-gray-300 p-12 text-center">
+      <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      <h3 class="mt-2 text-sm font-semibold text-gray-900">No saved HTML files found</h3>
+      <p class="mt-1 text-sm text-gray-500">Save a preview from the HTML editor to populate this list.</p>
+    </div>
+
+    <!-- List -->
+    <div id="files-list" class="flex flex-col gap-3"></div>
+    </section>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const isEmbedded = params.get("embedded") === "1";
+    const editBookId = params.get("editBookId");
+    const activeUser = window.DigitxtStore.getSession();
+    if (activeUser && activeUser.role === "student") {
+      window.location.href = "student-dashboard.html";
+    }
+
+    if (isEmbedded) {
+      document.querySelector("header")?.classList.add("hidden");
+    }
+
+    const list = document.getElementById("files-list");
+    const emptyState = document.getElementById("empty-state");
+    const buildBookButton = document.getElementById("build-book-btn");
+    const clearBookSelectionButton = document.getElementById("clear-book-selection-btn");
+    const selectAllFilesButton = document.getElementById("select-all-files-btn");
+    const bookMakerStatus = document.getElementById("book-maker-status");
+    const savedFilesCount = document.getElementById("saved-files-count");
+    const savedFileSearchInput = document.getElementById("saved-file-search");
+    const bookMakerTitleInput = document.getElementById("book-maker-title");
+    const bookMakerAuthorInput = document.getElementById("book-maker-author");
+    const bookMakerYearInput = document.getElementById("book-maker-year");
+    const bookMakerCoverInput = document.getElementById("book-maker-cover");
+
+    let selectedChapterIds = new Set();
+    let savedFileSearchQuery = "";
+    let editingBook = null;
+    let existingBookChapters = [];
+    let editSelectionInitialized = false;
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttribute(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/\"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function formatDate(value) {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    async function getStoredFiles() {
+      const files = await window.DigitxtStore.listHtmlFiles();
+      if (!Array.isArray(files)) return [];
+
+      return files
+        .filter(Boolean)
+        .map((file, index) => ({
+          ...file,
+          id: file.id || `saved-html-${index + 1}`,
+          name: file.name || file.fileName || `Saved HTML ${index + 1}`,
+          content: String(file.content || file.html || file.code || "")
+        }));
+    }
+
+    function slugify(value) {
+      return String(value || "chapter-book")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
+    }
+
+    function getBookMetadata() {
+      return {
+        title: bookMakerTitleInput.value.trim(),
+        author: bookMakerAuthorInput.value.trim(),
+        year: bookMakerYearInput.value.trim(),
+        coverImage: bookMakerCoverInput.value.trim()
+      };
+    }
+
+    function getSelectedFiles(savedFiles) {
+      const selectedContentKeys = new Set(
+        savedFiles
+          .filter((file) => selectedChapterIds.has(file.id))
+          .map((file) => getContentKey(file))
+      );
+      const existingContentKeys = new Set(existingBookChapters.map((chapter) => getContentKey(chapter)));
+      const selectedExistingChapters = existingBookChapters.filter((chapter) => selectedContentKeys.has(getContentKey(chapter)));
+      const newFiles = savedFiles
+        .filter((file) => selectedChapterIds.has(file.id))
+        .filter((file) => !existingContentKeys.has(getContentKey(file)));
+      return [...selectedExistingChapters, ...newFiles];
+    }
+
+    function getContentKey(file) {
+      return String(file.content || "");
+    }
+
+    function updateSelectionStatus(totalFiles) {
+      const selectedCount = selectedChapterIds.size;
+      bookMakerStatus.textContent = selectedCount
+        ? `${selectedCount} chapter${selectedCount === 1 ? "" : "s"} selected${editingBook ? " for this book" : ""}. ${editingBook ? "Update the book when ready." : "Build the book when ready."}`
+        : editingBook
+          ? "No chapters selected. Tick saved HTML files to keep or add them to this book."
+          : "Select saved HTML pages below to add them to your chapter book.";
+    }
+
+    function showFileSkeletons() {
+      emptyState.classList.add("hidden");
+      list.innerHTML = Array.from({ length: 5 }).map(() => `
+        <article class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm md:flex-row md:items-center md:justify-between">
+          <div class="flex min-w-0 flex-1 items-start gap-4">
+            <div class="h-5 w-5 shrink-0 animate-pulse rounded bg-gray-200"></div>
+            <div class="min-w-0 flex-1">
+              <div class="h-5 w-2/3 animate-pulse rounded bg-gray-200"></div>
+              <div class="mt-3 h-4 w-full max-w-lg animate-pulse rounded bg-gray-100"></div>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <div class="h-8 w-16 animate-pulse rounded-md bg-gray-100"></div>
+            <div class="h-8 w-20 animate-pulse rounded-md bg-gray-100"></div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    async function saveChapterBook(bookHtml, metadata, fileName, contents) {
+      const entry = {
+        id: editingBook?.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        title: metadata.title || "Untitled Chapter Book",
+        author: metadata.author || "Unknown author",
+        year: metadata.year || "",
+        coverImage: metadata.coverImage || "",
+        fileName,
+        content: bookHtml,
+        contents,
+        metadata,
+        savedAt: new Date().toISOString()
+      };
+
+      return editingBook && window.DigitxtStore.updateChapterBook
+        ? await window.DigitxtStore.updateChapterBook(entry)
+        : await window.DigitxtStore.saveChapterBook(entry);
+    }
+
+    async function loadBookForEditing() {
+      if (!editBookId) return;
+      try {
+        const books = await window.DigitxtStore.listChapterBooks();
+        editingBook = books.find((book) => book.id === editBookId) || null;
+        if (!editingBook) {
+          bookMakerStatus.textContent = "This chapter book could not be found. You can still build a new one.";
+          return;
+        }
+
+        const metadata = editingBook.metadata || {};
+        bookMakerTitleInput.value = editingBook.title || metadata.title || "";
+        bookMakerAuthorInput.value = editingBook.author || metadata.author || "";
+        bookMakerYearInput.value = editingBook.year || metadata.year || "";
+        bookMakerCoverInput.value = editingBook.coverImage || metadata.coverImage || "";
+        existingBookChapters = Array.isArray(editingBook.contents)
+          ? editingBook.contents.map((chapter, index) => ({
+              ...chapter,
+              id: chapter.id || `chapter-${index + 1}`,
+              chapterId: chapter.id || `chapter-${index + 1}`,
+              name: chapter.title || `Chapter ${index + 1}`,
+              metadata: {
+                title: chapter.title || `Chapter ${index + 1}`,
+                author: chapter.author || "",
+                year: chapter.year || ""
+              },
+              content: String(chapter.content || "")
+            }))
+          : [];
+        buildBookButton.textContent = "Update Chapter Book";
+        bookMakerStatus.textContent = `Editing "${editingBook.title || "Chapter Book"}". Tick files to keep or add chapters; untick files to remove them.`;
+      } catch (error) {
+        console.error("Unable to load chapter book for editing:", error);
+        bookMakerStatus.textContent = error.message || "Unable to load this chapter book for editing.";
+      }
+    }
+
+    async function buildChapterBook() {
+      const savedFiles = await getStoredFiles();
+      const selectedFiles = getSelectedFiles(savedFiles);
+
+      if (!selectedFiles.length) {
+        bookMakerStatus.textContent = "Select at least one saved HTML page before building a chapter book.";
+        return;
+      }
+
+      const metadata = getBookMetadata();
+      const bookTitle = metadata.title || "Untitled Chapter Book";
+      const bookAuthor = metadata.author || "Unknown author";
+      const bookYear = metadata.year || "";
+      const bookCover = metadata.coverImage || "";
+
+      const toc = selectedFiles.map((file, index) => {
+        const chapterTitle = file.metadata?.title || file.name || `Chapter ${index + 1}`;
+        return `<li><a href="#" data-chapter-index="${index}">${escapeHtml(chapterTitle)}</a></li>`;
+      }).join("");
+
+      const bookHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escapeHtml(bookTitle)}</title>
+  <style>
+    :root { color-scheme: light; }
+    html, body { height: 100%; }
+    body { margin: 0; width: 100%; height: 100vh; overflow: hidden; display: flex; font-family: Inter, "Segoe UI", Roboto, sans-serif; background: #f8fafc; color: #1e293b; }
+    a { color: inherit; text-decoration: none; }
+    .book-sidebar { width: 18rem; flex-shrink: 0; overflow-y: auto; border-right: 1px solid #e2e8f0; background: #ffffff; padding: 24px; }
+    .book-sidebar h1 { margin: 0; font-size: 1.25rem; line-height: 1.2; color: #0f172a; }
+    .book-sidebar p { margin: 8px 0 0; color: #64748b; font-size: 0.875rem; line-height: 1.45; }
+    .sidebar-cover { display: block; width: 70%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; margin: 18px auto 0; border: 1px solid #e2e8f0; background: #f8fafc; }
+    .reader-main { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; background: #f8fafc; }
+    .chapter-viewer { flex: 1; min-height: 0; overflow: hidden; background: #ffffff; }
+    .chapter-frame { display: block; width: 100%; height: 100%; border: 0; background: #ffffff; }
+    .menu-page { margin-top: 24px; }
+    .menu-page h2 { margin: 0 0 16px; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; }
+    .menu-page p { color: #6b7280; margin-bottom: 16px; }
+    .menu-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+    .menu-list li { padding-bottom: 12px; border-bottom: 1px solid #f1f5f9; }
+    .menu-list li:last-child { border: none; padding-bottom: 0; }
+    .menu-list li a { color: #2563eb; font-weight: 600; font-size: 0.95rem; display: block; }
+    .menu-list li a:hover { color: #1d4ed8; text-decoration: underline; }
+    .reader-controls { flex-shrink: 0; z-index: 10; padding: 12px 16px; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .reader-controls button { border: 0; border-radius: 99px; padding: 8px 16px; background: #f3f4f6; color: #374151; font-weight: 500; cursor: pointer; transition: all 0.2s; font-size: 0.875rem; }
+    .reader-controls button:hover { background: #e5e7eb; color: #111827; }
+    .reader-controls .primary-btn { background: #4f46e5; color: white; }
+    .reader-controls .primary-btn:hover { background: #4338ca; color: white; }
+    .reader-position { color: #6b7280; font-size: 0.875rem; font-weight: 500; display: none; }
+    @media (min-width: 600px) { .reader-position { display: block; } }
+    @media (max-width: 760px) {
+      body { flex-direction: column; overflow: hidden; }
+      .book-sidebar { width: auto; max-height: 35vh; border-right: 0; border-bottom: 1px solid #e2e8f0; }
+      .reader-main { min-height: 0; }
+      .reader-controls { align-items: stretch; flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <aside id="book-menu" class="book-sidebar">
+    <h1>${escapeHtml(bookTitle)}</h1>
+    <p>${escapeHtml(bookAuthor)}${bookYear ? " &bull; " + escapeHtml(bookYear) : ""}</p>
+    ${bookCover ? '<img class="sidebar-cover" src="' + escapeAttribute(bookCover) + '" alt="' + escapeAttribute(bookTitle) + '" />' : ""}
+    <section class="menu-page">
+      <h2>Table of Contents</h2>
+      <ul class="menu-list">${toc}</ul>
+    </section>
+  </aside>
+  <main class="reader-main">
+    <div class="reader-controls">
+      <button id="prev-chapter" type="button">Previous</button>
+      <span id="reader-position" class="reader-position">Chapter 1 of ${selectedFiles.length}</span>
+      <div style="display: flex; gap: 8px;">
+        <button id="open-full-chapter" type="button">Open Full Chapter</button>
+        <button id="next-chapter" type="button" class="primary-btn">Next</button>
+      </div>
+    </div>
+
+    <div class="chapter-viewer">
+      <iframe id="chapter-frame" class="chapter-frame" title="Chapter HTML preview" sandbox="allow-forms allow-modals allow-popups allow-same-origin allow-scripts"></iframe>
+    </div>
+  </main>
+  <script>
+    const chapterContents = ${JSON.stringify(selectedFiles.map((file, index) => ({
+      title: file.metadata?.title || file.name || `Chapter ${index + 1}`,
+      content: file.content.replace(/<\/script>/gi, '<\\/script>')
+    })))};
+    const chapterFrame = document.getElementById('chapter-frame');
+    const prevButton = document.getElementById('prev-chapter');
+    const nextButton = document.getElementById('next-chapter');
+    const openFullChapterButton = document.getElementById('open-full-chapter');
+    const readerPosition = document.getElementById('reader-position');
+    let currentChapterIndex = 0;
+
+    function updateReaderPosition() {
+      readerPosition.textContent = 'Chapter ' + (currentChapterIndex + 1) + ' of ' + chapterContents.length;
+    }
+
+    function showChapter(index) {
+      currentChapterIndex = Math.min(Math.max(index, 0), chapterContents.length - 1);
+      const chapter = chapterContents[currentChapterIndex];
+      if (!chapter) return;
+
+      chapterFrame.srcdoc = chapter.content || '<!DOCTYPE html><html><body></body></html>';
+      document.querySelectorAll('.menu-list a[data-chapter-index]').forEach((link) => {
+        link.style.color = Number(link.getAttribute('data-chapter-index')) === currentChapterIndex ? '#1d4ed8' : '#2563eb';
+      });
+      updateReaderPosition();
+    }
+
+    function goToNextChapter() {
+      showChapter(currentChapterIndex + 1);
+    }
+
+    function goToPrevChapter() {
+      showChapter(currentChapterIndex - 1);
+    }
+
+    prevButton.addEventListener('click', goToPrevChapter);
+    nextButton.addEventListener('click', goToNextChapter);
+    document.querySelectorAll('.menu-list a[data-chapter-index]').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        showChapter(Number(link.getAttribute('data-chapter-index')));
+      });
+    });
+    openFullChapterButton.addEventListener('click', () => {
+      const chapter = chapterContents[currentChapterIndex];
+      if (!chapter) return;
+
+      const payload = { type: 'fullPagePreview', content: chapter.content, chapter: null };
+      const token = 'full-page-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+      const storageKey = 'fullPagePreviewToken:' + token;
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+
+      const returnTo = "chapter-book-maker.html";
+      const returnLabel = "Return to Book Maker";
+      const url = 'full-page.html?token=' + encodeURIComponent(token) + '&returnTo=' + encodeURIComponent(returnTo) + '&returnLabel=' + encodeURIComponent(returnLabel);
+      window.location.href = url;
+
+      setTimeout(() => {
+        localStorage.removeItem(storageKey);
+      }, 20000);
+    });
+    showChapter(0);
+  <\/script>
+</body>
+</html>`;
+
+      const bookFileName = `${slugify(bookTitle)}.html`;
+      const contents = selectedFiles.map((file, index) => ({
+        id: file.chapterId || `chapter-${index + 1}`,
+        title: file.metadata?.title || file.name || `Chapter ${index + 1}`,
+        author: file.metadata?.author || "",
+        year: file.metadata?.year || "",
+        savedAt: file.savedAt || "",
+        content: file.content
+      }));
+      await saveChapterBook(bookHtml, metadata, bookFileName, contents);
+
+      selectedChapterIds = new Set();
+      renderFiles();
+      bookMakerStatus.textContent = `Success! ${editingBook ? "Updated" : "Built and saved"} "${bookTitle}" with ${selectedFiles.length} chapter${selectedFiles.length === 1 ? "" : "s"}.`;
+    }
+
+    async function renderFiles() {
+      showFileSkeletons();
+      try {
+        const savedFiles = await getStoredFiles();
+        const filteredFiles = savedFiles.filter((file) => {
+          if (!savedFileSearchQuery) {
+            return true;
+          }
+          const metadata = file.metadata || {};
+          const searchable = [metadata.title, metadata.author, metadata.year, file.name]
+            .filter(Boolean)
+            .map((value) => String(value).toLowerCase())
+            .join(" ");
+          return searchable.includes(savedFileSearchQuery);
+        });
+
+        if (!savedFiles.length) {
+          emptyState.querySelector("h3").textContent = "No saved HTML files found";
+          emptyState.querySelector("p").textContent = "Save a preview from the HTML editor to populate this list.";
+          emptyState.classList.remove("hidden");
+          list.innerHTML = "";
+          savedFilesCount.textContent = "0 saved files";
+          selectAllFilesButton.disabled = true;
+          selectAllFilesButton.classList.add("opacity-50", "cursor-not-allowed");
+          return;
+        }
+
+        selectAllFilesButton.disabled = false;
+        selectAllFilesButton.classList.remove("opacity-50", "cursor-not-allowed");
+
+        if (!filteredFiles.length) {
+          emptyState.querySelector("h3").textContent = "No matches";
+          emptyState.querySelector("p").textContent = `${savedFiles.length} saved HTML file${savedFiles.length === 1 ? "" : "s"} exist. Clear the search box to show all of them.`;
+          emptyState.classList.remove("hidden");
+          list.innerHTML = "";
+          savedFilesCount.textContent = `${savedFiles.length} saved file${savedFiles.length === 1 ? "" : "s"}`;
+          return;
+        }
+
+        emptyState.classList.add("hidden");
+        savedFilesCount.textContent = `${savedFiles.length} saved file${savedFiles.length === 1 ? "" : "s"}`;
+
+        if (editingBook && !editSelectionInitialized) {
+          const existingContentKeys = new Set(existingBookChapters.map((chapter) => getContentKey(chapter)));
+          selectedChapterIds = new Set(
+            savedFiles
+              .filter((file) => existingContentKeys.has(getContentKey(file)))
+              .map((file) => file.id)
+          );
+          editSelectionInitialized = true;
+        }
+
+        updateSelectionStatus(savedFiles.length);
+        
+        list.innerHTML = filteredFiles.map((file) => {
+          const metadata = file.metadata || {};
+          const title = escapeHtml(metadata.title || file.name || "Untitled");
+          const author = escapeHtml(metadata.author || "Unknown");
+          const year = escapeHtml(metadata.year || "");
+          const savedAt = escapeHtml(formatDate(file.savedAt));
+          const alreadyInBook = existingBookChapters.some((chapter) => getContentKey(chapter) === getContentKey(file));
+          const selected = selectedChapterIds.has(file.id) ? "checked" : "";
+
+          return `
+            <article class="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors gap-4">
+              <label class="flex items-start sm:items-center gap-4 cursor-pointer flex-1">
+                <div class="pt-1 sm:pt-0">
+                  <input type="checkbox" class="saved-file-select h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-600" data-id="${escapeAttribute(file.id)}" ${selected} />
+                </div>
+                <div>
+                  <h4 class="text-base font-semibold text-gray-900">${title}</h4>
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 mt-1">
+                    ${alreadyInBook ? `<span class="rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">In current book</span><span aria-hidden="true">&middot;</span>` : ""}
+                    <span>${author}</span>
+                    ${year ? `<span aria-hidden="true">&middot;</span><span>${year}</span>` : ""}
+                    <span aria-hidden="true">&middot;</span>
+                    <span>Saved ${savedAt}</span>
+                  </div>
+                </div>
+              </label>
+              <div class="flex items-center gap-2 pl-9 sm:pl-0">
+                <button data-open-id="${escapeAttribute(file.id)}" class="text-sm font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-md transition-colors">Open</button>
+                <button data-download-id="${escapeAttribute(file.id)}" class="text-sm font-medium text-gray-700 hover:text-gray-900 bg-gray-50 hover:bg-gray-200 border border-gray-200 px-3 py-1.5 rounded-md transition-colors">Download</button>
+              </div>
+            </article>
+          `;
+        }).join("");
+
+        list.querySelectorAll(".saved-file-select").forEach((checkbox) => {
+          checkbox.addEventListener("change", (event) => {
+            const id = event.target.getAttribute("data-id");
+            if (event.target.checked) {
+              selectedChapterIds.add(id);
+            } else {
+              selectedChapterIds.delete(id);
+            }
+            updateSelectionStatus(savedFiles.length);
+          });
+        });
+
+        list.querySelectorAll("button[data-open-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = savedFiles.find((entry) => entry.id === button.getAttribute("data-open-id"));
+            if (!item) return;
+
+            const token = `full-page-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            const previewStorageKey = `fullPagePreviewToken:${token}`;
+            const payload = { type: "fullPagePreview", content: item.content, chapter: null };
+            localStorage.setItem(previewStorageKey, JSON.stringify(payload));
+
+            const returnTo = "chapter-book-maker.html";
+            const returnLabel = "Return to Book Maker";
+            const url = `full-page.html?token=${encodeURIComponent(token)}&returnTo=${encodeURIComponent(returnTo)}&returnLabel=${encodeURIComponent(returnLabel)}`;
+            window.location.href = url;
+
+            setTimeout(() => {
+              localStorage.removeItem(previewStorageKey);
+            }, 20000);
+          });
+        });
+
+        list.querySelectorAll("button[data-download-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = savedFiles.find((entry) => entry.id === button.getAttribute("data-download-id"));
+            if (!item) return;
+
+            const blob = new Blob([item.content], { type: "text/html" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${item.name || "saved-file"}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          });
+        });
+      } catch (error) {
+        console.error("Unable to load saved files:", error);
+        emptyState.classList.remove("hidden");
+        list.innerHTML = "";
+      }
+    }
+
+    buildBookButton.addEventListener("click", buildChapterBook);
+    clearBookSelectionButton.addEventListener("click", () => {
+      selectedChapterIds = new Set();
+      bookMakerStatus.textContent = editingBook
+        ? "Selection cleared. Tick saved HTML files to keep or add chapters."
+        : "Selection cleared. Select saved HTML pages below to add them to your chapter book.";
+      renderFiles();
+    });
+
+    selectAllFilesButton.addEventListener("click", async () => {
+      const savedFiles = await getStoredFiles();
+      selectedChapterIds = new Set(savedFiles.map((file) => file.id));
+      renderFiles();
+    });
+
+    savedFileSearchInput.addEventListener("input", (event) => {
+      savedFileSearchQuery = event.target.value.trim().toLowerCase();
+      renderFiles();
+    });
+
+    // Initialize list on load
+    loadBookForEditing().then(renderFiles);
+  </script>
+</body>
+</html>

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTML Editor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-store.js"></script>
+  <style>
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f3f4f6;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+    textarea {
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+    iframe {
+      background: white;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 h-screen w-screen overflow-hidden flex flex-col font-sans text-gray-900 antialiased">
+
+  <!-- Header -->
+  <header class="bg-white px-6 py-4 flex flex-col md:flex-row justify-between items-center border-b border-gray-200 shadow-sm z-10 gap-4">
+    <div class="flex items-center gap-3 w-full md:w-auto">
+      <div class="bg-blue-600 p-2 rounded-lg shadow-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+          viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          class="text-white">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap w-full md:w-auto md:justify-end">
+      <!-- Secondary Actions -->
+      <label class="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors cursor-pointer">
+        Open File
+        <input id="file-input" type="file" accept=".html,.htm,text/html" class="hidden">
+      </label>
+
+      <button id="btn-saved-files" class="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+        Saved Files
+      </button>
+
+      <button id="btn-book-maker" class="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+        Book Maker
+      </button>
+
+      <button id="btn-chapter-books" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        Chapter Books
+      </button>
+
+      <a href="index.html" class="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+        Sign In
+      </a>
+
+      <a href="teacher-dashboard.html" class="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+        Dashboard
+      </a>
+
+      <button id="btn-clear" class="inline-flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50 transition-colors">
+        Clear
+      </button>
+
+      <!-- Primary Actions -->
+      <div class="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
+
+      <button id="btn-run" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        Run Preview
+      </button>
+
+      <button id="btn-full-page" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        Full Page
+      </button>
+
+      <button id="btn-save" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        Save
+      </button>
+    </div>
+  </header>
+
+  <!-- Metadata Section -->
+  <section class="bg-white border-b border-gray-200 px-6 py-4 shadow-sm z-0">
+    <div class="grid gap-4 lg:grid-cols-4">
+      <div class="flex flex-col gap-1">
+        <label for="book-title" class="text-xs font-semibold uppercase tracking-wider text-gray-500">File name</label>
+        <input id="book-title" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Enter file name" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="book-author" class="text-xs font-semibold uppercase tracking-wider text-gray-500">Author</label>
+        <input id="book-author" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Enter author" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="book-year" class="text-xs font-semibold uppercase tracking-wider text-gray-500">Year</label>
+        <input id="book-year" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="2026" />
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="book-notes" class="text-xs font-semibold uppercase tracking-wider text-gray-500">Chapter notes</label>
+        <textarea id="book-notes" rows="1" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Add a short note or summary for this chapter"></textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- Embedded Dashboard Actions -->
+  <section id="embedded-editor-actions" class="hidden bg-white border-b border-gray-200 px-6 py-3 shadow-sm z-0">
+    <div class="flex flex-wrap items-center justify-end gap-2">
+      <button id="btn-run-embedded" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+        Run Preview
+      </button>
+      <button id="btn-full-page-embedded" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
+        Full Page
+      </button>
+      <button id="btn-save-embedded" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">
+        Save
+      </button>
+    </div>
+  </section>
+
+  <!-- Main Content -->
+  <main class="flex-1 grid grid-cols-1 md:grid-cols-2 overflow-hidden bg-gray-50">
+
+    <!-- Code Editor -->
+    <section class="flex flex-col min-h-0 border-r border-gray-200">
+      <div class="bg-gray-100 px-4 py-2 text-sm font-semibold border-b border-gray-200 text-gray-700 flex items-center justify-between shadow-sm z-10">
+        HTML / CSS / JS
+      </div>
+      <textarea
+        id="code-editor"
+        class="flex-1 w-full bg-white text-gray-800 font-mono text-sm p-4 overflow-auto focus:ring-2 focus:ring-inset focus:ring-blue-500 shadow-inner"
+        spellcheck="false"
+        placeholder="Paste your complete HTML file here..."></textarea>
+    </section>
+
+    <!-- Preview -->
+    <section class="flex flex-col min-h-0">
+      <div class="bg-gray-100 px-4 py-2 text-sm font-semibold border-b border-gray-200 text-gray-700 shadow-sm z-10">
+        Preview
+      </div>
+      <iframe id="preview-frame" class="flex-1 w-full border-0 bg-white shadow-inner"></iframe>
+    </section>
+
+  </main>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const params = new URLSearchParams(window.location.search);
+      const isEmbedded = params.get("embedded") === "1";
+      const activeUser = window.DigitxtStore.getSession();
+      if (activeUser && activeUser.role === "student") {
+        window.location.href = "student-dashboard.html";
+        return;
+      }
+
+      if (isEmbedded) {
+        document.querySelector("header")?.classList.add("hidden");
+        document.getElementById("embedded-editor-actions")?.classList.remove("hidden");
+      }
+
+      const codeEditor = document.getElementById("code-editor");
+      const previewFrame = document.getElementById("preview-frame");
+      const fileInput = document.getElementById("file-input");
+
+      const btnRun = document.getElementById("btn-run");
+      const btnRunEmbedded = document.getElementById("btn-run-embedded");
+      const btnFullPage = document.getElementById("btn-full-page");
+      const btnFullPageEmbedded = document.getElementById("btn-full-page-embedded");
+      const btnSavedFiles = document.getElementById("btn-saved-files");
+      const btnBookMaker = document.getElementById("btn-book-maker");
+      const btnChapterBooks = document.getElementById("btn-chapter-books");
+      const btnSave = document.getElementById("btn-save");
+      const btnSaveEmbedded = document.getElementById("btn-save-embedded");
+      const btnClear = document.getElementById("btn-clear");
+      const bookTitleInput = document.getElementById("book-title");
+      const bookAuthorInput = document.getElementById("book-author");
+      const bookYearInput = document.getElementById("book-year");
+      const bookNotesInput = document.getElementById("book-notes");
+
+      let currentPreviewUrl = null;
+
+      // Start completely blank
+      codeEditor.value = "";
+      previewFrame.removeAttribute("src");
+
+      function hasMathLive(code) {
+        return code.toLowerCase().includes("mathlive");
+      }
+
+      function hasMathJax(code) {
+        return code.toLowerCase().includes("mathjax");
+      }
+
+      function seemsToNeedMathLive(code) {
+        return code.toLowerCase().includes("<math-field");
+      }
+
+      function seemsToNeedMathJax(code) {
+        return (
+          code.includes("\\(") ||
+          code.includes("\\[") ||
+          code.includes("$$")
+        );
+      }
+
+      function injectIntoHead(code, injection) {
+        if (code.toLowerCase().includes("</head>")) {
+          return code.replace(/<\/head>/i, injection + "\n</head>");
+        }
+        return injection + "\n" + code;
+      }
+
+      function protectScriptEndTags(code) {
+        const scriptOpenPattern = /<script\b[^>]*>/ig;
+        let output = "";
+        let cursor = 0;
+        let openMatch = null;
+
+        while ((openMatch = scriptOpenPattern.exec(code))) {
+          output += code.slice(cursor, openMatch.index) + openMatch[0];
+
+          let index = scriptOpenPattern.lastIndex;
+          let quote = "";
+          let escaped = false;
+
+          while (index < code.length) {
+            const lowerSlice = code.slice(index, index + 9).toLowerCase();
+
+            if (quote && lowerSlice === "</" + "script>") {
+              output += "<\\/script>";
+              index += 9;
+              escaped = false;
+              continue;
+            }
+
+            if (!quote && lowerSlice === "</" + "script>") {
+              output += code.slice(index, index + 9);
+              index += 9;
+              break;
+            }
+
+            const char = code[index];
+            output += char;
+
+            if (quote) {
+              if (escaped) {
+                escaped = false;
+              } else if (char === "\\") {
+                escaped = true;
+              } else if (char === quote) {
+                quote = "";
+              }
+            } else if (char === "'" || char === '"' || char === "`") {
+              quote = char;
+            }
+
+            index += 1;
+          }
+
+          cursor = index;
+          scriptOpenPattern.lastIndex = index;
+        }
+
+        return output + code.slice(cursor);
+      }
+
+      function prepareCode(code) {
+        let fixedCode = code;
+
+        // Add MathLive only if the pasted code uses <math-field> but forgot the MathLive script.
+        if (seemsToNeedMathLive(fixedCode) && !hasMathLive(fixedCode)) {
+          const mathLiveScript =
+            '<script src="https://unpkg.com/mathlive?modules=false"></' + 'script>';
+          fixedCode = injectIntoHead(fixedCode, mathLiveScript);
+        }
+
+        // Add MathJax only if the pasted code has LaTeX math but forgot the MathJax script.
+        if (seemsToNeedMathJax(fixedCode) && !hasMathJax(fixedCode)) {
+          const mathJaxScript =
+            '<script>' + "\n" +
+            'window.MathJax = {' + "\n" +
+            '  tex: {' + "\n" +
+            '    inlineMath: [["\\\\(", "\\\\)"]],' + "\n" +
+            '    displayMath: [["\\\\[", "\\\\]"]]' + "\n" +
+            '  },' + "\n" +
+            '  svg: { fontCache: "global" }' + "\n" +
+            '};' + "\n" +
+            '</' + 'script>' + "\n" +
+            '<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></' + 'script>';
+          fixedCode = injectIntoHead(fixedCode, mathJaxScript);
+        }
+
+        return protectScriptEndTags(fixedCode);
+      }
+
+      function getBookMetadata() {
+        return {
+          title: bookTitleInput.value.trim(),
+          author: bookAuthorInput.value.trim(),
+          year: bookYearInput.value.trim(),
+          notes: bookNotesInput.value.trim()
+        };
+      }
+
+      async function saveToLibrary(code) {
+        try {
+          const now = new Date();
+          const metadata = getBookMetadata();
+          const fallbackName = `saved-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+          const entry = {
+            id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            name: metadata.title || fallbackName,
+            content: code,
+            savedAt: now.toISOString(),
+            metadata
+          };
+
+          return await window.DigitxtStore.saveHtmlFile(entry);
+        } catch (error) {
+          console.error("Unable to save file:", error);
+          alert(`Unable to save this HTML file. ${error.message || error} Run supabase-schema.sql in your Supabase SQL Editor, then try again.`);
+          return null;
+        }
+      }
+
+      function makeBlobUrl(code) {
+        const blob = new Blob([code], { type: "text/html" });
+        return URL.createObjectURL(blob);
+      }
+
+      function runPreview() {
+  const rawCode = codeEditor.value.trim();
+
+  if (!rawCode) {
+    previewFrame.removeAttribute("src");
+    if (currentPreviewUrl) {
+      URL.revokeObjectURL(currentPreviewUrl);
+      currentPreviewUrl = null;
+    }
+    return;
+  }
+
+  if (currentPreviewUrl) {
+    URL.revokeObjectURL(currentPreviewUrl);
+    currentPreviewUrl = null;
+  }
+
+  const preparedCode = prepareCode(codeEditor.value);
+  const safePreviewCode = preparedCode.replace(
+    /<head>/i,
+    '<head><base target="_top">'
+  );
+
+  currentPreviewUrl = makeBlobUrl(safePreviewCode);
+  previewFrame.src = currentPreviewUrl;
+}
+
+      function openDedicatedFullPage() {
+        const rawCode = codeEditor.value.trim();
+
+        if (!rawCode) {
+          alert("Paste some HTML code first.");
+          return;
+        }
+
+        const preparedCode = prepareCode(codeEditor.value);
+        const token = `full-page-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const storageKey = `fullPagePreviewToken:${token}`;
+        const payload = {
+          type: "fullPagePreview",
+          content: preparedCode,
+          chapter: null,
+          noteSourceKey: "html-editor-draft"
+        };
+
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+
+        const returnTo = "html-editor.html";
+        const returnLabel = "Return to Editor";
+        const url = `full-page.html?token=${encodeURIComponent(token)}&returnTo=${encodeURIComponent(returnTo)}&returnLabel=${encodeURIComponent(returnLabel)}`;
+        window.top.location.href = url;
+
+        setTimeout(function () {
+          localStorage.removeItem(storageKey);
+        }, 20000);
+      }
+
+      async function saveFile() {
+        const rawCode = codeEditor.value.trim();
+
+        if (!rawCode) {
+          alert("Paste some HTML code first.");
+          return;
+        }
+
+        const preparedCode = prepareCode(codeEditor.value);
+        const saved = await saveToLibrary(preparedCode);
+        if (saved) {
+          alert(window.DigitxtStore.isSupabaseConfigured() ? "Saved to Supabase." : "Saved to browser storage. Add your Supabase URL and anon key in supabase-config.js to save to the database.");
+        }
+      }
+
+      function openSavedFilesPage() {
+        window.location.href = isEmbedded ? "saved-files.html?embedded=1" : "saved-files.html";
+      }
+
+      function openBookMakerPage() {
+        window.location.href = isEmbedded ? "chapter-book-maker.html?embedded=1" : "chapter-book-maker.html";
+      }
+
+      function clearAll() {
+        codeEditor.value = "";
+        previewFrame.removeAttribute("src");
+
+        if (currentPreviewUrl) {
+          URL.revokeObjectURL(currentPreviewUrl);
+          currentPreviewUrl = null;
+        }
+      }
+
+      function handleTab(e) {
+        if (e.key === "Tab") {
+          e.preventDefault();
+
+          const target = e.target;
+          const start = target.selectionStart;
+          const end = target.selectionEnd;
+
+          target.value =
+            target.value.substring(0, start) +
+            "  " +
+            target.value.substring(end);
+
+          target.selectionStart = target.selectionEnd = start + 2;
+        }
+      }
+
+      fileInput.addEventListener("change", function () {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          codeEditor.value = event.target.result;
+          runPreview();
+        };
+        reader.readAsText(file);
+      });
+
+      btnRun.addEventListener("click", runPreview);
+      btnRunEmbedded.addEventListener("click", runPreview);
+      btnFullPage.addEventListener("click", openDedicatedFullPage);
+      btnFullPageEmbedded.addEventListener("click", openDedicatedFullPage);
+      btnSavedFiles.addEventListener("click", openSavedFilesPage);
+      btnBookMaker.addEventListener("click", openBookMakerPage);
+      btnChapterBooks.addEventListener("click", function () {
+        window.location.href = isEmbedded ? "chapter-books.html?embedded=1" : "chapter-books.html";
+      });
+      btnSave.addEventListener("click", saveFile);
+      btnSaveEmbedded.addEventListener("click", saveFile);
+      btnClear.addEventListener("click", clearAll);
+      codeEditor.addEventListener("keydown", handleTab);
+    });
+  </script>
+</body>
+</html>

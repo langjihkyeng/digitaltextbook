@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter Books</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-store.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+  <div class="max-w-6xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
+    <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8 pb-6 border-b border-gray-200">
+      <div>
+        <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Chapter Books</h1>
+        <p class="text-gray-500 mt-2">Browse the chapter books you have built and open them anytime.</p>
+      </div>
+    </header>
+
+    <div id="empty-state" class="hidden rounded-xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
+      <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+      </svg>
+      <h3 class="mt-2 text-sm font-semibold text-gray-900">No chapter books yet</h3>
+      <p class="mt-1 text-sm text-gray-500">Build a chapter book from saved pages to see it appear here.</p>
+    </div>
+
+    <div id="books-list" class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"></div>
+  </div>
+
+  <div id="delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/40 px-4">
+    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl ring-1 ring-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Delete chapter book?</h2>
+      <p class="mt-2 text-sm text-gray-600">
+        This will permanently remove <span id="delete-book-title" class="font-medium text-gray-900"></span> from created chapter books. Students enrolled in it will no longer be able to open it.
+      </p>
+      <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button id="btn-cancel-delete" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button id="btn-confirm-delete" class="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-500 transition-colors">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const isEmbedded = params.get("embedded") === "1";
+    const activeUser = window.DigitxtStore.getSession();
+    if (activeUser && activeUser.role === "student") {
+      window.location.href = "student-dashboard.html";
+    }
+
+    if (isEmbedded) {
+      document.querySelector("header")?.classList.add("hidden");
+    }
+
+    const list = document.getElementById("books-list");
+    const emptyState = document.getElementById("empty-state");
+    const deleteModal = document.getElementById("delete-modal");
+    const deleteBookTitle = document.getElementById("delete-book-title");
+    const cancelDeleteButton = document.getElementById("btn-cancel-delete");
+    const confirmDeleteButton = document.getElementById("btn-confirm-delete");
+    let pendingDeleteBook = null;
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttribute(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/\"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function formatDate(value) {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    async function getStoredBooks() {
+      return await window.DigitxtStore.listChapterBooks();
+    }
+
+    function getBookTitle(entry) {
+      return entry.title || entry.metadata?.title || "Untitled Chapter Book";
+    }
+
+    function showBookSkeletons() {
+      emptyState.classList.add("hidden");
+      list.innerHTML = Array.from({ length: 6 }).map(() => `
+        <article class="flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="mx-auto mb-4 aspect-[3/4] w-full max-w-48 animate-pulse rounded-lg bg-gray-200"></div>
+          <div class="h-5 w-3/4 animate-pulse rounded bg-gray-200"></div>
+          <div class="mt-3 h-4 w-full animate-pulse rounded bg-gray-100"></div>
+          <div class="mt-2 h-4 w-2/3 animate-pulse rounded bg-gray-100"></div>
+          <div class="mt-5 flex gap-2">
+            <div class="h-9 w-16 animate-pulse rounded-md bg-gray-100"></div>
+            <div class="h-9 w-16 animate-pulse rounded-md bg-gray-100"></div>
+            <div class="h-9 flex-1 animate-pulse rounded-md bg-gray-200"></div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function showDeleteReminder(entry) {
+      pendingDeleteBook = entry;
+      deleteBookTitle.textContent = getBookTitle(entry);
+      deleteModal.classList.remove("hidden");
+      deleteModal.classList.add("flex");
+      confirmDeleteButton.focus();
+    }
+
+    function hideDeleteReminder() {
+      pendingDeleteBook = null;
+      deleteModal.classList.add("hidden");
+      deleteModal.classList.remove("flex");
+      confirmDeleteButton.disabled = false;
+      confirmDeleteButton.textContent = "Delete";
+    }
+
+    async function deleteBook() {
+      if (!pendingDeleteBook) return;
+
+      confirmDeleteButton.disabled = true;
+      confirmDeleteButton.textContent = "Deleting...";
+
+      try {
+        await window.DigitxtStore.deleteChapterBook(pendingDeleteBook.id);
+        hideDeleteReminder();
+        await renderBooks();
+      } catch (error) {
+        console.error("Unable to delete chapter book:", error);
+        alert(`Unable to delete this chapter book. ${error.message || error}`);
+        confirmDeleteButton.disabled = false;
+        confirmDeleteButton.textContent = "Delete";
+      }
+    }
+
+    function openBook(entry) {
+      const target = `book-menu.html?bookId=${encodeURIComponent(entry.id)}${activeUser?.role === "teacher" ? "&teacherMode=1" : ""}`;
+      window.location.href = target;
+    }
+
+    function editBook(entry) {
+      const target = `chapter-book-maker.html?editBookId=${encodeURIComponent(entry.id)}${isEmbedded ? "&embedded=1" : ""}`;
+      window.location.href = target;
+    }
+
+    function downloadBook(entry) {
+      const blob = new Blob([entry.content], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = entry.fileName || "chapter-book.html";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    async function renderBooks() {
+      showBookSkeletons();
+      try {
+        const books = await getStoredBooks();
+
+        if (!books.length) {
+          emptyState.classList.remove("hidden");
+          list.innerHTML = "";
+          return;
+        }
+
+        emptyState.classList.add("hidden");
+        list.innerHTML = books.map((book) => {
+          const metadata = book.metadata || {};
+          const title = escapeHtml(getBookTitle(book));
+          const author = escapeHtml(book.author || metadata.author || "Unknown author");
+          const year = escapeHtml(book.year || metadata.year || "");
+          const savedAt = escapeHtml(formatDate(book.savedAt));
+          const coverImage = escapeAttribute(book.coverImage || metadata.coverImage || "");
+
+          return `
+            <article class="flex flex-col rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:border-blue-300 transition-colors">
+              <div class="mx-auto mb-4 aspect-[3/4] w-full max-w-48 overflow-hidden rounded-lg border border-gray-100 bg-gray-50">
+                ${coverImage
+                  ? `<img src="${coverImage}" alt="${title}" class="h-full w-full object-cover" />`
+                  : `<div class="flex h-full w-full items-center justify-center px-3 text-center text-sm font-medium text-gray-500">No cover image</div>`}
+              </div>
+              <div class="flex-1">
+                <h4 class="text-lg font-semibold text-gray-900">${title}</h4>
+                <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+                  <span>${author}</span>
+                  ${year ? `<span aria-hidden="true">&middot;</span><span>${year}</span>` : ""}
+                  <span aria-hidden="true">&middot;</span>
+                  <span>Saved ${savedAt}</span>
+                </div>
+              </div>
+              <div class="mt-5 flex items-center gap-2">
+                <button data-open-id="${escapeAttribute(book.id)}" class="rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">Open</button>
+                <button data-edit-id="${escapeAttribute(book.id)}" class="rounded-md bg-white px-4 py-2 text-sm font-medium text-blue-700 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 transition-colors">Edit</button>
+                <button data-download-id="${escapeAttribute(book.id)}" class="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Download</button>
+                <button data-delete-id="${escapeAttribute(book.id)}" class="rounded-md bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 hover:text-red-500 transition-colors">Delete</button>
+              </div>
+            </article>
+          `;
+        }).join("");
+
+        list.querySelectorAll("button[data-open-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = books.find((entry) => entry.id === button.getAttribute("data-open-id"));
+            if (item) {
+              openBook(item);
+            }
+          });
+        });
+
+        list.querySelectorAll("button[data-download-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = books.find((entry) => entry.id === button.getAttribute("data-download-id"));
+            if (item) {
+              downloadBook(item);
+            }
+          });
+        });
+
+        list.querySelectorAll("button[data-edit-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = books.find((entry) => entry.id === button.getAttribute("data-edit-id"));
+            if (item) {
+              editBook(item);
+            }
+          });
+        });
+
+        list.querySelectorAll("button[data-delete-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            const item = books.find((entry) => entry.id === button.getAttribute("data-delete-id"));
+            if (item) {
+              showDeleteReminder(item);
+            }
+          });
+        });
+      } catch (error) {
+        console.error("Unable to load chapter books:", error);
+        emptyState.classList.remove("hidden");
+        list.innerHTML = "";
+      }
+    }
+
+    cancelDeleteButton.addEventListener("click", hideDeleteReminder);
+    confirmDeleteButton.addEventListener("click", deleteBook);
+    deleteModal.addEventListener("click", (event) => {
+      if (event.target === deleteModal) {
+        hideDeleteReminder();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !deleteModal.classList.contains("hidden")) {
+        hideDeleteReminder();
+      }
+    });
+
+    renderBooks();
+  </script>
+</body>
+</html>

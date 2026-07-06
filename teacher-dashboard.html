@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teacher Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-store.js"></script>
+</head>
+<body class="h-screen w-screen overflow-hidden bg-gray-100 text-gray-900 font-sans antialiased">
+  <div class="flex h-full">
+    <aside class="flex w-72 shrink-0 flex-col border-r border-gray-200 bg-white">
+      <div class="border-b border-gray-200 p-5">
+        <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Teacher</p>
+        <h1 class="mt-1 text-xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+        <p id="teacher-name" class="mt-2 text-sm text-gray-500">Signed in</p>
+      </div>
+
+      <nav class="flex-1 space-y-2 p-4">
+        <button data-page="html-editor.html?embedded=1" class="dashboard-link w-full rounded-md bg-blue-50 px-3 py-2 text-left text-sm font-semibold text-blue-700">HTML Editor</button>
+        <button data-page="saved-files.html?embedded=1" class="dashboard-link w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">Saved Files</button>
+        <button data-page="chapter-book-maker.html?embedded=1" class="dashboard-link w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">Create Chapter Book</button>
+        <button data-page="chapter-books.html?embedded=1" class="dashboard-link w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">Created Chapter Books</button>
+      </nav>
+
+      <div class="border-t border-gray-200 p-4">
+        <button id="sign-out" class="w-full rounded-md bg-white px-3 py-2 text-sm font-medium text-red-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50">Sign Out</button>
+      </div>
+    </aside>
+
+    <main class="flex min-w-0 flex-1 flex-col">
+      <header class="flex h-14 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4">
+        <h2 id="dashboard-title" class="text-sm font-semibold text-gray-900">HTML Editor</h2>
+      </header>
+      <div class="relative min-h-0 flex-1 bg-white">
+        <div id="frame-skeleton" class="absolute inset-0 z-10 bg-gray-50 p-6">
+          <div class="grid h-full grid-cols-1 gap-5 md:grid-cols-2">
+            <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <div class="h-5 w-40 animate-pulse rounded bg-gray-200"></div>
+              <div class="mt-5 space-y-3">
+                <div class="h-4 w-full animate-pulse rounded bg-gray-100"></div>
+                <div class="h-4 w-11/12 animate-pulse rounded bg-gray-100"></div>
+                <div class="h-4 w-4/5 animate-pulse rounded bg-gray-100"></div>
+              </div>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <div class="h-5 w-32 animate-pulse rounded bg-gray-200"></div>
+              <div class="mt-5 h-64 animate-pulse rounded bg-gray-100"></div>
+            </div>
+          </div>
+        </div>
+        <iframe id="dashboard-frame" src="html-editor.html?embedded=1" class="h-full w-full border-0 bg-white"></iframe>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const user = window.DigitxtStore.getSession();
+    const teacherName = document.getElementById("teacher-name");
+    const frame = document.getElementById("dashboard-frame");
+    const frameSkeleton = document.getElementById("frame-skeleton");
+    const title = document.getElementById("dashboard-title");
+
+    if (!user) {
+      window.location.href = "index.html";
+    } else if (user.role !== "teacher") {
+      window.location.href = "student-dashboard.html";
+    } else {
+      teacherName.textContent = `${user.username} (${user.role})`;
+    }
+
+    const labels = {
+      "html-editor.html": "HTML Editor",
+      "saved-files.html": "Saved Files",
+      "chapter-book-maker.html": "Create Chapter Book",
+      "chapter-books.html": "Created Chapter Books"
+    };
+
+    function setActive(page) {
+      frameSkeleton.classList.remove("hidden");
+      frame.src = page;
+      const pageName = page.split("?")[0];
+      title.textContent = labels[pageName] || "Teacher Dashboard";
+
+      document.querySelectorAll(".dashboard-link").forEach((button) => {
+        const active = button.getAttribute("data-page") === page;
+        button.className = active
+          ? "dashboard-link w-full rounded-md bg-blue-50 px-3 py-2 text-left text-sm font-semibold text-blue-700"
+          : "dashboard-link w-full rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50";
+      });
+    }
+
+    frame.addEventListener("load", () => {
+      frameSkeleton.classList.add("hidden");
+    });
+
+    document.querySelectorAll(".dashboard-link").forEach((button) => {
+      button.addEventListener("click", () => setActive(button.getAttribute("data-page")));
+    });
+
+    document.getElementById("sign-out").addEventListener("click", () => {
+      window.DigitxtStore.signOut();
+      window.location.href = "index.html";
+    });
+  </script>
+</body>
+</html>

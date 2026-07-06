@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digitxt Sign In</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-store.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+  <main class="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
+    <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div class="mb-6">
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Digitxt Account</h1>
+        <p class="mt-2 text-sm text-gray-500">Sign in or create an account with a username and password.</p>
+      </div>
+
+      <div class="mb-5 grid grid-cols-2 rounded-lg bg-gray-100 p-1">
+        <button id="signin-tab" type="button" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Sign In</button>
+        <button id="signup-tab" type="button" class="rounded-md px-3 py-2 text-sm font-semibold text-gray-600">Sign Up</button>
+      </div>
+
+      <form id="auth-form" class="grid gap-4">
+        <div>
+          <label for="username" class="block text-sm font-medium text-gray-900">Username</label>
+          <input id="username" name="username" autocomplete="username" required minlength="3" class="mt-2 block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-600 sm:text-sm" placeholder="studentname" />
+        </div>
+
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-900">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required minlength="4" class="mt-2 block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-600 sm:text-sm" placeholder="Password" />
+        </div>
+
+        <div id="role-field" class="hidden">
+          <label class="block text-sm font-medium text-gray-900">Account type</label>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <label data-role-option class="flex cursor-pointer items-center justify-center rounded-md border border-blue-600 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700">
+              <input class="sr-only" type="radio" name="role" value="student" checked />
+              Student
+            </label>
+            <label data-role-option class="flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700">
+              <input class="sr-only" type="radio" name="role" value="teacher" />
+              Teacher
+            </label>
+          </div>
+        </div>
+
+        <p id="auth-status" class="hidden rounded-md border px-3 py-2 text-sm"></p>
+
+        <button id="submit-button" type="submit" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">Sign In</button>
+      </form>
+
+      <div class="mt-5 flex justify-between text-sm">
+        <a id="back-link" href="html-editor.html" class="font-medium text-blue-600 hover:text-blue-500">Back to Editor</a>
+        <button id="signout-button" type="button" class="font-medium text-gray-500 hover:text-gray-700">Sign Out</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const signinTab = document.getElementById("signin-tab");
+    const signupTab = document.getElementById("signup-tab");
+    const authForm = document.getElementById("auth-form");
+    const roleField = document.getElementById("role-field");
+    const submitButton = document.getElementById("submit-button");
+    const statusBox = document.getElementById("auth-status");
+    const signoutButton = document.getElementById("signout-button");
+    const backLink = document.getElementById("back-link");
+
+    let mode = "signin";
+    const currentUser = window.DigitxtStore.getSession();
+
+    if (currentUser?.role === "student") {
+      backLink.href = "student-dashboard.html";
+      backLink.textContent = "Back to Dashboard";
+    }
+
+    function setStatus(message, type) {
+      statusBox.textContent = message;
+      statusBox.className = type === "success"
+        ? "rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
+        : "rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700";
+    }
+
+    function setMode(nextMode) {
+      mode = nextMode;
+      const isSignup = mode === "signup";
+      roleField.classList.toggle("hidden", !isSignup);
+      submitButton.textContent = isSignup ? "Sign Up" : "Sign In";
+      signinTab.className = isSignup
+        ? "rounded-md px-3 py-2 text-sm font-semibold text-gray-600"
+        : "rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm";
+      signupTab.className = isSignup
+        ? "rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm"
+        : "rounded-md px-3 py-2 text-sm font-semibold text-gray-600";
+    }
+
+    function updateRoleButtons() {
+      document.querySelectorAll("[data-role-option]").forEach((label) => {
+          const checked = label.querySelector("input").checked;
+          label.className = checked
+            ? "flex cursor-pointer items-center justify-center rounded-md border border-blue-600 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700"
+            : "flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700";
+        });
+    }
+
+    document.querySelectorAll("[data-role-option]").forEach((label) => {
+      label.addEventListener("click", () => {
+        label.querySelector("input").checked = true;
+        updateRoleButtons();
+      });
+    });
+
+    signinTab.addEventListener("click", () => setMode("signin"));
+    signupTab.addEventListener("click", () => setMode("signup"));
+
+    authForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      submitButton.disabled = true;
+      submitButton.textContent = mode === "signup" ? "Signing Up..." : "Signing In...";
+
+      try {
+        const formData = new FormData(authForm);
+        const username = String(formData.get("username") || "").trim();
+        const password = String(formData.get("password") || "");
+        const role = String(formData.get("role") || "student");
+        const user = mode === "signup"
+          ? await window.DigitxtStore.signUp(username, password, role)
+          : await window.DigitxtStore.signIn(username, password);
+
+        setStatus(`Signed in as ${user.username} (${user.role}).`, "success");
+        setTimeout(() => {
+          window.location.href = user.role === "teacher" ? "teacher-dashboard.html" : "student-dashboard.html";
+        }, 600);
+      } catch (error) {
+        setStatus(error.message || String(error), "error");
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = mode === "signup" ? "Sign Up" : "Sign In";
+      }
+    });
+
+    signoutButton.addEventListener("click", () => {
+      window.DigitxtStore.signOut();
+      setStatus("Signed out.", "success");
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="supabase-store.js"></script>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+  <main class="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <header class="mb-6 flex flex-col gap-4 border-b border-gray-200 pb-6 md:flex-row md:items-end md:justify-between">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Student</p>
+        <h1 class="mt-1 text-3xl font-bold tracking-tight text-gray-900">Chapter Books</h1>
+        <p id="student-name" class="mt-2 text-sm text-gray-500">Search, enroll, and open your class chapter books.</p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href="index.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">Account</a>
+        <button id="sign-out" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-red-600 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50 transition-colors">Sign Out</button>
+      </div>
+    </header>
+
+    <section class="mb-4 grid grid-cols-3 gap-1 rounded-lg bg-gray-100 p-1 sm:max-w-2xl">
+      <button id="tab-enrolled-books" type="button" data-tab="enrolled" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">Enrolled Books</button>
+      <button id="tab-saved-activities" type="button" data-tab="activities" class="rounded-md px-3 py-2 text-sm font-semibold text-gray-600">Notes</button>
+      <button id="tab-all-books" type="button" data-tab="all" class="rounded-md px-3 py-2 text-sm font-semibold text-gray-600">All Books</button>
+    </section>
+
+    <section class="mb-6 grid gap-3 md:grid-cols-[1fr_auto]">
+      <label class="sr-only" for="book-search">Search chapter books</label>
+      <input id="book-search" type="search" class="block w-full rounded-md border-0 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-blue-600 sm:text-sm" placeholder="Search by title, author, year, or chapter" />
+      <div class="flex items-center rounded-md bg-white px-4 py-3 text-sm text-gray-600 shadow-sm ring-1 ring-inset ring-gray-200">
+        <span id="books-count">0 books</span>
+      </div>
+    </section>
+
+    <p id="status-box" class="hidden mb-5 rounded-md border px-3 py-2 text-sm"></p>
+
+    <div id="empty-state" class="hidden rounded-lg border-2 border-dashed border-gray-300 bg-white p-12 text-center">
+      <h3 class="text-sm font-semibold text-gray-900">No chapter books found</h3>
+      <p class="mt-1 text-sm text-gray-500">Try another search or ask your teacher to create a chapter book.</p>
+    </div>
+
+    <div id="books-list" class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"></div>
+  </main>
+
+  <script>
+    const user = window.DigitxtStore.getSession();
+    const studentName = document.getElementById("student-name");
+    const searchInput = document.getElementById("book-search");
+    const booksCount = document.getElementById("books-count");
+    const statusBox = document.getElementById("status-box");
+    const emptyState = document.getElementById("empty-state");
+    const list = document.getElementById("books-list");
+    const tabAllBooks = document.getElementById("tab-all-books");
+    const tabEnrolledBooks = document.getElementById("tab-enrolled-books");
+    const tabSavedActivities = document.getElementById("tab-saved-activities");
+
+    let books = [];
+    let enrollmentIds = new Set();
+    let activitySaves = [];
+    let activeTab = "enrolled";
+
+    const canUseDashboard = Boolean(user && user.role === "student");
+
+    if (!user) {
+      window.location.href = "index.html";
+    } else if (user.role === "teacher") {
+      window.location.href = "teacher-dashboard.html";
+    } else {
+      studentName.textContent = `${user.username} (${user.role})`;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttribute(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/\"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function formatDate(value) {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    function setStatus(message, type) {
+      statusBox.textContent = message;
+      statusBox.className = type === "success"
+        ? "mb-5 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
+        : "mb-5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700";
+    }
+
+    function clearStatus() {
+      statusBox.className = "hidden mb-5 rounded-md border px-3 py-2 text-sm";
+      statusBox.textContent = "";
+    }
+
+    function getBookTitle(book) {
+      return book.title || book.metadata?.title || "Untitled Chapter Book";
+    }
+
+    function getSearchText(book) {
+      const chapterText = Array.isArray(book.contents)
+        ? book.contents.map((chapter) => `${chapter.title || ""} ${chapter.author || ""} ${chapter.year || ""}`).join(" ")
+        : "";
+      return `${getBookTitle(book)} ${book.author || ""} ${book.year || ""} ${chapterText}`.toLowerCase();
+    }
+
+    function getActivitySearchText(activity) {
+      return [
+        activity.bookTitle,
+        activity.chapterTitle,
+        activity.metadata?.username,
+        activity.savedAt
+      ].filter(Boolean).join(" ").toLowerCase();
+    }
+
+    function getActivityTime(activity) {
+      return new Date(activity.updatedAt || activity.savedAt || 0).getTime() || 0;
+    }
+
+    function getActivityChapterKey(activity) {
+      const chapterBookId = activity.chapterBookId || activity.chapter_book_id || "";
+      const chapterId = activity.chapterId || activity.chapter_id || "";
+      if (chapterBookId || chapterId) {
+        return `${chapterBookId}:${chapterId}`;
+      }
+      return `activity:${activity.id}`;
+    }
+
+    function getLatestActivitiesByChapter(activities) {
+      const groups = new Map();
+
+      activities.forEach((activity) => {
+        const key = getActivityChapterKey(activity);
+        const existing = groups.get(key);
+        if (!existing) {
+          groups.set(key, { key, latest: activity, activities: [activity] });
+          return;
+        }
+
+        existing.activities.push(activity);
+        if (getActivityTime(activity) > getActivityTime(existing.latest)) {
+          existing.latest = activity;
+        }
+      });
+
+      return Array.from(groups.values()).sort((a, b) => {
+        return getActivityTime(b.latest) - getActivityTime(a.latest);
+      });
+    }
+
+    function isEnrolled(bookId) {
+      return enrollmentIds.has(bookId);
+    }
+
+    function getChapterCopy(chapterBookId, chapterId) {
+      return activitySaves.find((activity) => (
+        activity.chapterBookId === chapterBookId &&
+        activity.chapterId === chapterId
+      ));
+    }
+
+    function isEnrollmentSeed(activity) {
+      return Boolean(activity?.activityState?.seededFromEnrollment);
+    }
+
+    function getCurrentStudentCopy(book, chapter) {
+      const chapterCopy = getChapterCopy(book.id, chapter.id);
+      if (!chapterCopy) return null;
+
+      if (!isEnrollmentSeed(chapterCopy)) {
+        return chapterCopy;
+      }
+
+      const originalSavedAt = chapterCopy.metadata?.originalSavedAt || "";
+      const chapterSavedAt = chapter.savedAt || "";
+      const seedStillMatchesChapter = (
+        chapterCopy.content === (chapter.content || "") &&
+        (!originalSavedAt || !chapterSavedAt || originalSavedAt === chapterSavedAt)
+      );
+
+      return seedStillMatchesChapter ? chapterCopy : null;
+    }
+
+    function getTabBooks() {
+      return activeTab === "enrolled"
+        ? books.filter((book) => isEnrolled(book.id))
+        : books;
+    }
+
+    function updateTabs() {
+      tabAllBooks.className = activeTab === "all"
+        ? "rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm"
+        : "rounded-md px-3 py-2 text-sm font-semibold text-gray-600";
+      tabEnrolledBooks.className = activeTab === "enrolled"
+        ? "rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm"
+        : "rounded-md px-3 py-2 text-sm font-semibold text-gray-600";
+      tabSavedActivities.className = activeTab === "activities"
+        ? "rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm"
+        : "rounded-md px-3 py-2 text-sm font-semibold text-gray-600";
+    }
+
+    function showBookSkeletons() {
+      emptyState.classList.add("hidden");
+      list.innerHTML = Array.from({ length: 6 }).map(() => `
+        <article class="flex min-h-full flex-col rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="mx-auto mb-4 aspect-[3/4] w-full max-w-48 animate-pulse rounded-md bg-gray-200"></div>
+          <div class="mb-3 h-5 w-20 animate-pulse rounded bg-gray-100"></div>
+          <div class="h-5 w-3/4 animate-pulse rounded bg-gray-200"></div>
+          <div class="mt-3 h-4 w-full animate-pulse rounded bg-gray-100"></div>
+          <div class="mt-5 h-9 w-full animate-pulse rounded-md bg-gray-200"></div>
+        </article>
+      `).join("");
+    }
+
+    function showNoteSkeletons() {
+      emptyState.classList.add("hidden");
+      list.innerHTML = Array.from({ length: 6 }).map(() => `
+        <article class="flex min-h-full flex-col rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <div class="h-6 w-16 animate-pulse rounded-md bg-green-100"></div>
+          <div class="mt-4 h-5 w-3/4 animate-pulse rounded bg-gray-200"></div>
+          <div class="mt-3 h-4 w-full animate-pulse rounded bg-gray-100"></div>
+          <div class="mt-5 h-9 w-full animate-pulse rounded-md bg-gray-200"></div>
+          <div class="mt-2 h-9 w-full animate-pulse rounded-md bg-gray-100"></div>
+        </article>
+      `).join("");
+    }
+
+    async function ensureStudentBookCopy(book) {
+      if (!book || !Array.isArray(book.contents)) return;
+
+      const ensuredCopies = await window.DigitxtStore.ensureStudentBookCopy(user.id, book);
+      activitySaves = [
+        ...ensuredCopies,
+        ...activitySaves.filter((activity) => activity.chapterBookId !== book.id)
+      ];
+    }
+
+    async function openBook(entry) {
+      if (!isEnrolled(entry.id)) {
+        setStatus("Enroll in this chapter book before opening it.", "error");
+        return;
+      }
+
+      try {
+        await ensureStudentBookCopy(entry);
+        const target = `book-menu.html?bookId=${encodeURIComponent(entry.id)}&studentMode=1`;
+        window.location.href = target;
+      } catch (error) {
+        console.error("Unable to create student book copy:", error);
+        setStatus(error.message || "Unable to create your copy of this chapter book.", "error");
+      }
+    }
+
+    async function enrollBook(bookId) {
+      clearStatus();
+      try {
+        const wasEnrolled = isEnrolled(bookId);
+        const book = books.find((entry) => entry.id === bookId);
+        await window.DigitxtStore.enrollInChapterBook(user.id, bookId);
+        enrollmentIds.add(bookId);
+
+        if (!wasEnrolled && book && Array.isArray(book.contents)) {
+          const seededCopies = await Promise.all(book.contents.map((item, index) => {
+            const chapterId = item.id || `chapter-${index + 1}`;
+            return window.DigitxtStore.saveStudentActivity({
+              userId: user.id,
+              chapterBookId: book.id,
+              chapterId,
+              bookTitle: getBookTitle(book),
+              chapterTitle: item.title || `Chapter ${index + 1}`,
+              content: "",
+              activityState: { studentBookCopy: true, seededFromEnrollment: true, notes: "" },
+              metadata: {
+                originalSavedAt: item.savedAt || "",
+                copiedAt: new Date().toISOString(),
+                noteOnly: true
+              }
+            });
+          }));
+          activitySaves = [
+            ...seededCopies,
+            ...activitySaves.filter((activity) => activity.chapterBookId !== book.id)
+          ];
+        }
+
+        setStatus("Enrolled. You can open this chapter book now.", "success");
+        renderBooks();
+      } catch (error) {
+        console.error("Unable to enroll:", error);
+        setStatus(error.message || String(error), "error");
+      }
+    }
+
+    function openSavedActivity(activity) {
+      const returnTo = activity.chapterBookId
+        ? `book-menu.html?bookId=${encodeURIComponent(activity.chapterBookId)}&studentMode=1`
+        : "student-dashboard.html";
+      const returnLabel = activity.chapterBookId
+        ? "Return to Book Menu"
+        : "Return to Student Dashboard";
+
+      if (activity.chapterBookId && activity.chapterId) {
+        const directTarget = `full-page.html?bookId=${encodeURIComponent(activity.chapterBookId)}&chapterId=${encodeURIComponent(activity.chapterId)}&studentMode=1&returnTo=${encodeURIComponent(returnTo)}&returnLabel=${encodeURIComponent(returnLabel)}`;
+        window.location.href = directTarget;
+        return;
+      }
+
+      const token = `full-page-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const storageKey = `fullPagePreviewToken:${token}`;
+      const payload = {
+        type: "fullPagePreview",
+        content: activity.content,
+        chapter: null,
+        studentMode: true,
+        chapterBookId: activity.chapterBookId,
+        chapterId: activity.chapterId,
+        bookTitle: activity.bookTitle,
+        chapterTitle: activity.chapterTitle,
+        useSavedSnapshot: true,
+        activityState: activity.activityState || {}
+      };
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+
+      const target = `full-page.html?token=${encodeURIComponent(token)}&returnTo=${encodeURIComponent(returnTo)}&returnLabel=${encodeURIComponent(returnLabel)}`;
+      window.location.href = target;
+
+      setTimeout(() => {
+        localStorage.removeItem(storageKey);
+      }, 20000);
+    }
+
+    function renderActivities() {
+      const query = searchInput.value.trim().toLowerCase();
+      const groupedActivities = getLatestActivitiesByChapter(activitySaves);
+      const visibleGroups = query
+        ? groupedActivities.filter((group) => getActivitySearchText(group.latest).includes(query))
+        : groupedActivities;
+
+      booksCount.textContent = `${visibleGroups.length} ${visibleGroups.length === 1 ? "chapter" : "chapters"} with notes`;
+      updateTabs();
+
+      if (!visibleGroups.length) {
+        emptyState.classList.remove("hidden");
+        emptyState.querySelector("h3").textContent = "No notes found";
+        emptyState.querySelector("p").textContent = "Open an enrolled chapter, write notes, and use Save Notes to keep them here.";
+        list.innerHTML = "";
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      list.innerHTML = visibleGroups.map((group) => {
+        const activity = group.latest;
+        const bookTitle = escapeHtml(activity.bookTitle || "Chapter notes");
+        const chapterTitle = escapeHtml(activity.chapterTitle || "HTML page");
+        const savedAt = escapeHtml(formatDate(activity.updatedAt || activity.savedAt));
+
+        return `
+          <article class="flex min-h-full flex-col rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-blue-300">
+            <div class="flex-1">
+              <span class="rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700">Notes</span>
+              <h2 class="mt-3 text-lg font-semibold text-gray-900">${chapterTitle}</h2>
+              <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+                <span>${bookTitle}</span>
+                <span aria-hidden="true">&middot;</span>
+                <span>Saved ${savedAt}</span>
+              </div>
+            </div>
+            <div class="mt-5 flex flex-col gap-2">
+              <button data-activity-key="${escapeAttribute(group.key)}" class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Open Chapter Notes</button>
+              <button data-delete-activity-key="${escapeAttribute(group.key)}" class="w-full rounded-md bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors">Delete Notes</button>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      list.querySelectorAll("button[data-activity-key]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const group = visibleGroups.find((entry) => entry.key === button.getAttribute("data-activity-key"));
+          if (group?.latest) openSavedActivity(group.latest);
+        });
+      });
+
+      list.querySelectorAll("button[data-delete-activity-key]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const group = visibleGroups.find((entry) => entry.key === button.getAttribute("data-delete-activity-key"));
+          if (!group?.latest) return;
+
+          const confirmed = window.confirm(`Delete your notes for "${group.latest.chapterTitle || "this chapter"}"? The teacher's original HTML will not be changed.`);
+          if (!confirmed) return;
+
+          try {
+            await Promise.all(group.activities.map((activity) => (
+              window.DigitxtStore.deleteStudentActivitySave(user.id, activity.id)
+            )));
+            const deletedIds = new Set(group.activities.map((activity) => activity.id));
+            activitySaves = activitySaves.filter((entry) => !deletedIds.has(entry.id));
+            setStatus("Your saved copy was deleted.", "success");
+            renderActivities();
+          } catch (error) {
+            console.error("Unable to delete saved activity:", error);
+            setStatus(error.message || String(error), "error");
+          }
+        });
+      });
+    }
+
+    function renderBooks() {
+      if (activeTab === "activities") {
+        renderActivities();
+        return;
+      }
+
+      const query = searchInput.value.trim().toLowerCase();
+      const tabBooks = getTabBooks();
+      const visibleBooks = query
+        ? tabBooks.filter((book) => getSearchText(book).includes(query))
+        : tabBooks;
+
+      booksCount.textContent = `${visibleBooks.length} ${visibleBooks.length === 1 ? "book" : "books"}`;
+      updateTabs();
+
+      if (!visibleBooks.length) {
+        emptyState.classList.remove("hidden");
+        emptyState.querySelector("h3").textContent = activeTab === "enrolled"
+          ? "No enrolled books found"
+          : "No chapter books found";
+        emptyState.querySelector("p").textContent = activeTab === "enrolled"
+          ? "Enroll in a chapter book from All Books to see it here."
+          : "Try another search or ask your teacher to create a chapter book.";
+        list.innerHTML = "";
+        return;
+      }
+
+      emptyState.classList.add("hidden");
+      list.innerHTML = visibleBooks.map((book) => {
+        const title = escapeHtml(getBookTitle(book));
+        const author = escapeHtml(book.author || book.metadata?.author || "Unknown author");
+        const year = escapeHtml(book.year || book.metadata?.year || "");
+        const savedAt = escapeHtml(formatDate(book.savedAt));
+        const coverImage = escapeAttribute(book.coverImage || book.metadata?.coverImage || "");
+        const chapterCount = Array.isArray(book.contents) ? book.contents.length : 0;
+        const enrolled = isEnrolled(book.id);
+
+        return `
+          <article class="flex min-h-full flex-col rounded-lg border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-blue-300">
+            <div class="mx-auto mb-4 aspect-[3/4] w-full max-w-48 overflow-hidden rounded-md border border-gray-100 bg-gray-50">
+              ${coverImage
+                ? `<img src="${coverImage}" alt="${title}" class="h-full w-full object-cover" />`
+                : `<div class="flex h-full w-full items-center justify-center px-3 text-center text-sm font-medium text-gray-500">No cover image</div>`}
+            </div>
+            <div class="flex-1">
+              <div class="mb-2 flex items-center justify-between gap-2">
+                <span class="rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">${chapterCount} ${chapterCount === 1 ? "chapter" : "chapters"}</span>
+                ${enrolled ? `<span class="rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700">Enrolled</span>` : ""}
+              </div>
+              <h2 class="text-lg font-semibold text-gray-900">${title}</h2>
+              <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
+                <span>${author}</span>
+                ${year ? `<span aria-hidden="true">&middot;</span><span>${year}</span>` : ""}
+                <span aria-hidden="true">&middot;</span>
+                <span>Created ${savedAt}</span>
+              </div>
+            </div>
+            <div class="mt-5">
+              ${enrolled
+                ? `<button data-open-id="${escapeAttribute(book.id)}" class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Open Chapter Book</button>`
+                : `<button data-enroll-id="${escapeAttribute(book.id)}" class="w-full rounded-md bg-white px-4 py-2 text-sm font-medium text-blue-700 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 transition-colors">Enroll</button>`}
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      list.querySelectorAll("button[data-enroll-id]").forEach((button) => {
+        button.addEventListener("click", () => enrollBook(button.getAttribute("data-enroll-id")));
+      });
+
+      list.querySelectorAll("button[data-open-id]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const item = books.find((book) => book.id === button.getAttribute("data-open-id"));
+          if (item) await openBook(item);
+        });
+      });
+    }
+
+    async function loadDashboard() {
+      activeTab === "activities" ? showNoteSkeletons() : showBookSkeletons();
+      try {
+        const [storedBooks, enrollments] = await Promise.all([
+          window.DigitxtStore.listChapterBooks(),
+          window.DigitxtStore.listStudentEnrollments(user.id)
+        ]);
+        books = storedBooks;
+        enrollmentIds = new Set(enrollments.map((entry) => entry.chapterBookId || entry.chapter_book_id));
+
+        try {
+          activitySaves = await window.DigitxtStore.listStudentActivitySaves(user.id);
+        } catch (activityError) {
+          console.error("Unable to load saved activities:", activityError);
+          activitySaves = [];
+        }
+
+        renderBooks();
+      } catch (error) {
+        console.error("Unable to load student dashboard:", error);
+        setStatus(error.message || String(error), "error");
+        emptyState.classList.remove("hidden");
+      }
+    }
+
+    searchInput.addEventListener("input", renderBooks);
+    tabAllBooks.addEventListener("click", () => {
+      activeTab = "all";
+      renderBooks();
+    });
+    tabEnrolledBooks.addEventListener("click", () => {
+      activeTab = "enrolled";
+      renderBooks();
+    });
+    tabSavedActivities.addEventListener("click", () => {
+      activeTab = "activities";
+      renderBooks();
+    });
+    document.getElementById("sign-out").addEventListener("click", () => {
+      window.DigitxtStore.signOut();
+      window.location.href = "index.html";
+    });
+
+    if (canUseDashboard) {
+      loadDashboard();
+    }
+  </script>
+</body>
+</html>
