@@ -566,7 +566,9 @@
                 blocks.push({ type: "text", html: block.querySelector("[contenteditable]")?.innerHTML || "" });
               } else if (type === "equation") {
                 var field = block.querySelector("math-field");
-                blocks.push({ type: "equation", latex: field?.value || "" });
+                var latex = getEquationLatex(field);
+                if (digitxtNoteBlocks[blockId]) digitxtNoteBlocks[blockId].latex = latex;
+                blocks.push({ type: "equation", latex: latex });
               } else if (type === "table") {
                 var rows = [];
                 block.querySelectorAll("tr").forEach(function (row) {
@@ -585,6 +587,16 @@
               }
             });
             return { type: "digitxt-note-document", version: 1, title: title, blocks: blocks };
+          }
+
+          function getEquationLatex(field) {
+            if (!field) return "";
+            try {
+              if (typeof field.getValue === "function") return String(field.getValue() || "");
+            } catch (error) {
+              // Fall back to the field value while MathLive is still loading.
+            }
+            return String(field.value || field.textContent || "");
           }
 
           function serializeNotesForSave() {
@@ -656,6 +668,8 @@
             } else if (type === "equation") {
               var latex = value?.latex || "";
               var field = document.createElement("math-field");
+              var equationWasEdited = false;
+              digitxtNoteBlocks[blockId] = { latex: latex };
               field.textContent = latex;
               field.value = latex;
               field.style.width = "100%";
@@ -664,6 +678,13 @@
               field.style.outline = "none";
               field.style.background = "transparent";
               field.mathVirtualKeyboardPolicy = "manual";
+              function captureEquationValue() {
+                equationWasEdited = true;
+                digitxtNoteBlocks[blockId].latex = getEquationLatex(field);
+              }
+              field.addEventListener("input", captureEquationValue);
+              field.addEventListener("change", captureEquationValue);
+              field.addEventListener("blur", captureEquationValue);
               field.addEventListener("keydown", function (event) {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -673,8 +694,11 @@
               }, true);
               body.appendChild(field);
               loadExternalScript("https://unpkg.com/mathlive").then(function () {
-                field.value = latex;
-                setTimeout(function () { if (field.focus) field.focus(); }, 0);
+                // Do not reset a field after a student has started typing: MathLive
+                // loads asynchronously, and resetting here used to lose later lines.
+                if (!equationWasEdited && !getEquationLatex(field)) field.value = latex;
+                digitxtNoteBlocks[blockId].latex = getEquationLatex(field);
+                setTimeout(function () { if (!equationWasEdited && field.focus) field.focus(); }, 0);
               });
             } else if (type === "table") {
               var rows = Array.isArray(value?.data) && value.data.length ? value.data : [[""]];
