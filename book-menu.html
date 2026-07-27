@@ -49,6 +49,26 @@
     const activeUser = window.DigitxtStore?.getSession ? window.DigitxtStore.getSession() : null;
     let currentMenuPayload = null;
 
+    function applyMenuBackground(imageUrl) {
+      const value = String(imageUrl || "").trim();
+      document.body.style.backgroundImage = "";
+      document.body.style.backgroundSize = "";
+      document.body.style.backgroundPosition = "";
+      document.body.style.backgroundAttachment = "";
+      if (!value) return;
+
+      try {
+        const parsedUrl = new URL(value, window.location.href);
+        if (!/^https?:$/.test(parsedUrl.protocol)) return;
+        document.body.style.backgroundImage = `url("${parsedUrl.href.replaceAll('"', '%22')}")`;
+        document.body.style.backgroundSize = "cover";
+        document.body.style.backgroundPosition = "center";
+        document.body.style.backgroundAttachment = "fixed";
+      } catch (error) {
+        console.warn("Ignoring an invalid book menu background image URL.", error);
+      }
+    }
+
     function escapeHtml(value) {
       return String(value || "")
         .replace(/&/g, "&amp;")
@@ -109,6 +129,7 @@
       return {
         bookTitle: entry.title || entry.metadata?.title || "Chapter Book",
         chapterBookId: entry.id || "",
+        menuBackgroundImage: entry.metadata?.menuBackgroundImage || "",
         studentMode: urlStudentMode,
         teacherMode: urlTeacherMode || activeUser?.role === "teacher",
         contents: Array.isArray(entry.contents)
@@ -263,6 +284,7 @@
         setStatus(error.message || "Unable to load this book menu.");
       }
       currentMenuPayload = payload;
+      applyMenuBackground(payload?.menuBackgroundImage);
       const contents = payload && Array.isArray(payload.contents) ? payload.contents : [];
 
       title.textContent = payload?.bookTitle || "Book Menu";

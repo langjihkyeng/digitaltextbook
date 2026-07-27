@@ -1,0 +1,43 @@
+/* Purple theme for the Digitxt sign-in page. */
+body {
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%) !important;
+  color: #2e1065 !important;
+}
+
+main > section {
+  border-color: #ddd6fe !important;
+  box-shadow: 0 12px 28px rgb(91 33 182 / 12%) !important;
+}
+
+h1,
+label {
+  color: #3b0764 !important;
+}
+
+.bg-gray-100 {
+  background-color: #f3e8ff !important;
+}
+
+.focus\:ring-blue-600:focus {
+  --tw-ring-color: #7c3aed !important;
+}
+
+.border-blue-600 {
+  border-color: #7c3aed !important;
+}
+
+.bg-blue-50 {
+  background-color: #f3e8ff !important;
+}
+
+.text-blue-700 {
+  color: #6d28d9 !important;
+}
+
+.bg-blue-600 {
+  background-color: #7c3aed !important;
+}
+
+.hover\:bg-blue-500:hover {
+  background-color: #6d28d9 !important;
+}

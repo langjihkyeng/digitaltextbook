@@ -67,6 +67,14 @@
             <input id="book-maker-cover" type="text" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Paste an image URL" />
           </div>
         </div>
+
+        <div class="lg:col-span-4">
+          <label for="book-menu-background" class="block text-sm font-medium leading-6 text-gray-900">Book menu background image URL</label>
+          <div class="mt-2">
+            <input id="book-menu-background" type="url" class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6" placeholder="Paste an image URL for the chapter menu background" />
+          </div>
+          <p class="mt-1 text-xs text-gray-500">Shown behind the chapter list when this book is opened.</p>
+        </div>
       </div>
 
       <p id="book-maker-status" class="mt-5 text-sm text-gray-500 bg-gray-50 p-3 rounded-md border border-gray-100">
@@ -129,6 +137,7 @@
     const bookMakerAuthorInput = document.getElementById("book-maker-author");
     const bookMakerYearInput = document.getElementById("book-maker-year");
     const bookMakerCoverInput = document.getElementById("book-maker-cover");
+    const bookMenuBackgroundInput = document.getElementById("book-menu-background");
 
     let selectedChapterIds = new Set();
     let savedFileSearchQuery = "";
@@ -185,7 +194,8 @@
         title: bookMakerTitleInput.value.trim(),
         author: bookMakerAuthorInput.value.trim(),
         year: bookMakerYearInput.value.trim(),
-        coverImage: bookMakerCoverInput.value.trim()
+        coverImage: bookMakerCoverInput.value.trim(),
+        menuBackgroundImage: bookMenuBackgroundInput.value.trim()
       };
     }
 
@@ -269,6 +279,7 @@
         bookMakerAuthorInput.value = editingBook.author || metadata.author || "";
         bookMakerYearInput.value = editingBook.year || metadata.year || "";
         bookMakerCoverInput.value = editingBook.coverImage || metadata.coverImage || "";
+        bookMenuBackgroundInput.value = metadata.menuBackgroundImage || "";
         existingBookChapters = Array.isArray(editingBook.contents)
           ? editingBook.contents.map((chapter, index) => ({
               ...chapter,

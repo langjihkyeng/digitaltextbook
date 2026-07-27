@@ -1,0 +1,56 @@
+/* Purple theme for the HTML editor. */
+:root {
+  --editor-purple: #7c3aed;
+  --editor-purple-dark: #6d28d9;
+  --editor-lavender: #faf5ff;
+  --editor-lavender-strong: #f3e8ff;
+  --editor-border: #ddd6fe;
+}
+
+body,
+main {
+  background-color: var(--editor-lavender) !important;
+  color: #2e1065 !important;
+}
+
+header,
+body > section,
+#embedded-editor-actions,
+textarea,
+iframe {
+  border-color: var(--editor-border) !important;
+}
+
+.bg-blue-600 {
+  background-color: var(--editor-purple) !important;
+}
+
+.hover\:bg-blue-500:hover {
+  background-color: var(--editor-purple-dark) !important;
+}
+
+.focus\:ring-blue-600:focus,
+.focus\:ring-blue-500:focus {
+  --tw-ring-color: var(--editor-purple) !important;
+}
+
+.bg-gray-100 {
+  background-color: var(--editor-lavender-strong) !important;
+}
+
+.border-gray-200,
+.border-gray-300 {
+  border-color: var(--editor-border) !important;
+}
+
+::-webkit-scrollbar-track {
+  background: #f3e8ff;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c4b5fd;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a78bfa;
+}

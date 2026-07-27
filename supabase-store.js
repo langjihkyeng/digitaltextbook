@@ -335,6 +335,31 @@
     return data;
   }
 
+  async function unenrollFromChapterBook(userId, chapterBookId) {
+    if (!userId || !chapterBookId) {
+      throw new Error("Choose an enrolled chapter book to remove.");
+    }
+
+    if (!client) {
+      const storageKey = getEnrollmentStorageKey(userId);
+      const stored = localJson(storageKey);
+      const nextStored = stored.filter((entry) => (
+        (entry.chapterBookId || entry.chapter_book_id) !== chapterBookId
+      ));
+      localStorage.setItem(storageKey, JSON.stringify(nextStored));
+      return true;
+    }
+
+    const { error } = await client
+      .from(tables.studentEnrollments || "student_enrollments")
+      .delete()
+      .eq("user_id", userId)
+      .eq("chapter_book_id", chapterBookId);
+
+    if (error) throw new Error(formatSupabaseError(error));
+    return true;
+  }
+
   async function saveStudentActivity(entry) {
     if (!entry || !entry.userId) {
       entry = { ...(entry || {}), userId: `preview-${Date.now()}` };
@@ -583,6 +608,7 @@
     deleteChapterBook,
     listStudentEnrollments,
     enrollInChapterBook,
+    unenrollFromChapterBook,
     ensureStudentBookCopy,
     saveStudentActivity,
     listStudentActivitySaves,

@@ -212,7 +212,7 @@ create table if not exists public.student_enrollments (
   unique (user_id, chapter_book_id)
 );
 
-grant select, insert, update on public.student_enrollments to anon;
+grant select, insert, update, delete on public.student_enrollments to anon;
 
 alter table public.student_enrollments enable row level security;
 
@@ -237,6 +237,13 @@ for update
 to anon
 using (true)
 with check (true);
+
+drop policy if exists "Allow public delete student enrollments" on public.student_enrollments;
+create policy "Allow public delete student enrollments"
+on public.student_enrollments
+for delete
+to anon
+using (true);
 
 create table if not exists public.student_activity_saves (
   id text primary key,

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Student Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="student-dashboard.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase-config.js"></script>
   <script src="supabase-store.js"></script>
@@ -306,6 +307,24 @@
       }
     }
 
+    async function deleteEnrolledBook(bookId) {
+      const book = books.find((entry) => entry.id === bookId);
+      if (!book || !isEnrolled(bookId)) return;
+
+      const confirmed = window.confirm(`Remove "${getBookTitle(book)}" from your enrolled books? The teacher's original book and your saved notes will not be deleted.`);
+      if (!confirmed) return;
+
+      try {
+        await window.DigitxtStore.unenrollFromChapterBook(user.id, bookId);
+        enrollmentIds.delete(bookId);
+        setStatus("Book removed from your enrolled books.", "success");
+        renderBooks();
+      } catch (error) {
+        console.error("Unable to remove enrolled book:", error);
+        setStatus(error.message || String(error), "error");
+      }
+    }
+
     function openSavedActivity(activity) {
       const returnTo = activity.chapterBookId
         ? `book-menu.html?bookId=${encodeURIComponent(activity.chapterBookId)}&studentMode=1`
@@ -476,9 +495,10 @@
                 <span>Created ${savedAt}</span>
               </div>
             </div>
-            <div class="mt-5">
+            <div class="mt-5 flex flex-col gap-2">
               ${enrolled
-                ? `<button data-open-id="${escapeAttribute(book.id)}" class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Open Chapter Book</button>`
+                ? `<button data-open-id="${escapeAttribute(book.id)}" class="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-500 transition-colors">Open Chapter Book</button>
+                   <button data-delete-enrollment-id="${escapeAttribute(book.id)}" class="w-full rounded-md bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 transition-colors">Delete Book</button>`
                 : `<button data-enroll-id="${escapeAttribute(book.id)}" class="w-full rounded-md bg-white px-4 py-2 text-sm font-medium text-blue-700 shadow-sm ring-1 ring-inset ring-blue-200 hover:bg-blue-50 transition-colors">Enroll</button>`}
             </div>
           </article>
@@ -493,6 +513,12 @@
         button.addEventListener("click", async () => {
           const item = books.find((book) => book.id === button.getAttribute("data-open-id"));
           if (item) await openBook(item);
+        });
+      });
+
+      list.querySelectorAll("button[data-delete-enrollment-id]").forEach((button) => {
+        button.addEventListener("click", () => {
+          deleteEnrolledBook(button.getAttribute("data-delete-enrollment-id"));
         });
       });
     }

@@ -1,0 +1,48 @@
+/* Violet theme for the teacher dashboard shell. */
+:root {
+  --teacher-violet: #7c3aed;
+  --teacher-violet-dark: #6d28d9;
+  --teacher-lavender: #faf5ff;
+  --teacher-lavender-strong: #f3e8ff;
+  --teacher-border: #ddd6fe;
+}
+
+body,
+#frame-skeleton {
+  background-color: var(--teacher-lavender) !important;
+  color: #2e1065 !important;
+}
+
+aside,
+header,
+.bg-white {
+  border-color: var(--teacher-border) !important;
+}
+
+.text-blue-600,
+.text-blue-700 {
+  color: var(--teacher-violet-dark) !important;
+}
+
+.bg-blue-50 {
+  background-color: var(--teacher-lavender-strong) !important;
+}
+
+.dashboard-link:hover:not(.bg-blue-50) {
+  background-color: #faf5ff !important;
+  color: var(--teacher-violet-dark) !important;
+}
+
+.border-gray-200,
+.border-gray-300 {
+  border-color: var(--teacher-border) !important;
+}
+
+.bg-gray-50,
+.bg-gray-100 {
+  background-color: var(--teacher-lavender) !important;
+}
+
+.bg-gray-200 {
+  background-color: #ddd6fe !important;
+}
