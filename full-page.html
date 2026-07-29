@@ -588,7 +588,7 @@ button.style.zIndex = "2147483647";
 
           function getEquationLatex(field) {
             if (!field) return "";
-            // `value` is MathLive's live LaTeX value once the custom element is
+            // The value property is MathLive's live LaTeX value once the custom element is
             // upgraded. Prefer it so the exact text a student just typed is saved.
             if (typeof field.value === "string" && field.value) return field.value;
             try {
@@ -695,7 +695,7 @@ button.style.zIndex = "2147483647";
               body.appendChild(field);
               loadExternalScript("https://unpkg.com/mathlive").then(function () {
                 // The field may have been created before MathLive registered the
-                // custom element. Upgrade a pre-load `value` into MathLive's real
+                // custom element. Upgrade a pre-load value into MathLive's real
                 // property, otherwise the visible equation can serialize as blank.
                 var pendingLatex = getEquationLatex(field) || latex;
                 if (Object.prototype.hasOwnProperty.call(field, "value")) delete field.value;
