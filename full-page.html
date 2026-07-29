@@ -558,7 +558,7 @@ button.style.zIndex = "2147483647";
                 blocks.push({ type: "text", html: block.querySelector("[contenteditable]")?.innerHTML || "" });
               } else if (type === "equation") {
                 var field = block.querySelector("math-field");
-                var latex = getEquationLatex(field);
+                var latex = getEquationLatex(field) || digitxtNoteBlocks[blockId]?.latex || "";
                 if (digitxtNoteBlocks[blockId]) digitxtNoteBlocks[blockId].latex = latex;
                 blocks.push({ type: "equation", latex: latex });
               } else if (type === "table") {
@@ -588,6 +588,9 @@ button.style.zIndex = "2147483647";
 
           function getEquationLatex(field) {
             if (!field) return "";
+            // `value` is MathLive's live LaTeX value once the custom element is
+            // upgraded. Prefer it so the exact text a student just typed is saved.
+            if (typeof field.value === "string" && field.value) return field.value;
             try {
               if (typeof field.getValue === "function") return String(field.getValue() || "");
             } catch (error) {
@@ -691,6 +694,13 @@ button.style.zIndex = "2147483647";
               }, true);
               body.appendChild(field);
               loadExternalScript("https://unpkg.com/mathlive").then(function () {
+                // The field may have been created before MathLive registered the
+                // custom element. Upgrade a pre-load `value` into MathLive's real
+                // property, otherwise the visible equation can serialize as blank.
+                var pendingLatex = getEquationLatex(field) || latex;
+                if (Object.prototype.hasOwnProperty.call(field, "value")) delete field.value;
+                field.value = pendingLatex;
+                digitxtNoteBlocks[blockId].latex = field.value || pendingLatex;
                 // MathLive has one shared virtual keyboard. Attach it to the notes
                 // panel (not document.body), so its absolute positioning is scoped
                 // to the student's writing column rather than the HTML preview.
