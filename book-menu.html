@@ -14,7 +14,7 @@
     <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-8 pb-6 border-b border-gray-200">
       <div>
         <h1 id="book-title" class="text-3xl font-bold text-gray-900 tracking-tight">Book Menu</h1>
-        <p class="text-gray-500 mt-2">Choose a chapter to open from this book.</p>
+        
       </div>
       <div class="flex flex-wrap gap-3">
         <a id="back-link" href="chapter-books.html" class="inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors">
@@ -153,7 +153,7 @@
         return null;
       }
       if (!window.DigitxtStore?.listChapterBooks) {
-        setStatus("Unable to load chapter books. Refresh the page and try again.");
+        setStatus("Refresh the page and try again.");
         return null;
       }
 
@@ -229,7 +229,7 @@
         : "student-dashboard.html";
       if (menuPayload?.chapterBookId && latestEntry.id) {
         const returnTarget = menuPayload.studentMode ? studentMenuReturn : "chapter-books.html";
-        const returnText = menuPayload.studentMode ? "Return to Book Menu" : "Back to Books";
+        const returnText = menuPayload.studentMode ? "Return" : "Back";
         const directUrl = `full-page.html?bookId=${encodeURIComponent(menuPayload.chapterBookId)}&chapterId=${encodeURIComponent(latestEntry.id)}&studentMode=${menuPayload.studentMode ? "1" : "0"}&teacherMode=${menuPayload.teacherMode ? "1" : "0"}&returnTo=${encodeURIComponent(returnTarget)}&returnLabel=${encodeURIComponent(returnText)}`;
         window.location.href = directUrl;
         return;
@@ -293,7 +293,7 @@
       }
       if (payload?.studentMode) {
         backLink.href = "student-dashboard.html";
-        backLink.textContent = "Back to Student Dashboard";
+        backLink.textContent = "Back";
       }
 
       if (!contents.length) {
@@ -302,39 +302,35 @@
         return;
       }
 
-      emptyState.classList.add("hidden");
-      list.innerHTML = contents.map((file, index) => {
-        const savedAt = formatDate(file.savedAt);
-        const details = [
-          file.author ? `by ${file.author}` : "",
-          file.year || "",
-          savedAt ? `Saved ${savedAt}` : ""
-        ].filter(Boolean);
+   emptyState.classList.add("hidden");
+list.innerHTML = contents.map((file, index) => {
+  const details = [
+    file.author ? `by ${file.author}` : "",
+    file.year || ""
+  ].filter(Boolean);
 
         return `
           <article class="flex flex-col sm:flex-row sm:items-center justify-between p-5 bg-white border border-gray-200 rounded-lg shadow-sm hover:border-blue-300 transition-colors gap-4">
             <div>
               <h4 class="text-base font-semibold text-gray-900">${escapeHtml(file.title || `Chapter ${index + 1}`)}</h4>
               <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 mt-1">
-                <span>Chapter ${index + 1}</span>
+               
                 ${details.map((detail) => `<span aria-hidden="true">&middot;</span><span>${escapeHtml(detail)}</span>`).join("")}
               </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <button data-open-id="${escapeAttribute(file.id || `chapter-${index + 1}`)}" class="text-sm font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-md transition-colors">Open</button>
-            </div>
+           
           </article>
         `;
       }).join("");
 
-      list.querySelectorAll("button[data-open-id]").forEach((button) => {
-        button.addEventListener("click", async () => {
-          const item = contents.find((entry, index) => (entry.id || `chapter-${index + 1}`) === button.getAttribute("data-open-id"));
-          if (item) {
-            await openHtmlPage(item);
-          }
-        });
-      });
+      list.querySelectorAll("article").forEach((card, index) => {
+  card.addEventListener("click", async () => {
+    const item = contents[index];
+
+    if (item) {
+      await openHtmlPage(item);
+    }
+  });
+});
     }
 
     renderMenu();

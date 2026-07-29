@@ -156,20 +156,7 @@
       const link = document.createElement("a");
       link.id = "digitxt-return-button";
       link.href = returnTo;
-      link.target = "_top";
-      link.textContent = returnLabel;
-      link.style.position = "fixed";
-      link.style.top = "1rem";
-      link.style.right = "1rem";
-      link.style.zIndex = "2147483647";
-      link.style.background = "#2563eb";
-      link.style.color = "#ffffff";
-      link.style.border = "1px solid #1d4ed8";
-      link.style.borderRadius = "999px";
-      link.style.padding = "0.65rem 1rem";
-      link.style.font = "600 0.875rem Inter, system-ui, sans-serif";
-      link.style.textDecoration = "none";
-      link.style.boxShadow = "0 10px 24px rgba(15, 23, 42, 0.16)";
+      
       document.body.appendChild(link);
     }
 
@@ -208,11 +195,16 @@
             button.style.background = background;
             button.style.color = "#ffffff";
             button.style.border = "1px solid " + borderColor;
-            button.style.borderRadius = "999px";
+            button.style.borderRadius = "6px";   // rectangular corners
+button.style.boxShadow = "none";    // remove shadow
+button.style.position = "fixed";
+button.style.top = "1rem";
+button.style.left = "1rem";
+button.style.zIndex = "2147483647";
             button.style.padding = "0.65rem 1rem";
             button.style.font = "600 0.875rem Inter, system-ui, sans-serif";
             button.style.textDecoration = "none";
-            button.style.boxShadow = "0 10px 24px rgba(15, 23, 42, 0.16)";
+      
             button.style.cursor = "pointer";
           }
 
@@ -577,6 +569,11 @@
                   }));
                 });
                 blocks.push({ type: "table", data: rows });
+              } else if (type === "sketch") {
+                blocks.push({
+                  type: "sketch",
+                  strokes: digitxtNoteBlocks[blockId]?.strokes || []
+                });
               } else if (type === "graph") {
                 blocks.push({
                   type: "graph",
@@ -670,7 +667,7 @@
               var field = document.createElement("math-field");
               var equationWasEdited = false;
               digitxtNoteBlocks[blockId] = { latex: latex };
-              field.textContent = latex;
+              
               field.value = latex;
               field.style.width = "100%";
               field.style.fontSize = "1.25rem";
@@ -694,6 +691,39 @@
               }, true);
               body.appendChild(field);
               loadExternalScript("https://unpkg.com/mathlive").then(function () {
+                // MathLive has one shared virtual keyboard. Attach it to the notes
+                // panel (not document.body), so its absolute positioning is scoped
+                // to the student's writing column rather than the HTML preview.
+                var notesPanel = document.getElementById("digitxt-notes-panel");
+                var keyboardDock = document.getElementById("digitxt-note-keyboard-dock");
+                var virtualKeyboard = window.mathVirtualKeyboard || globalThis.mathVirtualKeyboard;
+                if (notesPanel && keyboardDock && virtualKeyboard) {
+                  virtualKeyboard.container = keyboardDock;
+                  notesPanel.style.setProperty("--keyboard-zindex", "2147483647");
+                  if (!notesPanel.dataset.mathKeyboardDockBound) {
+                    notesPanel.dataset.mathKeyboardDockBound = "true";
+                    virtualKeyboard.addEventListener("virtual-keyboard-toggle", function (event) {
+                      keyboardDock.style.display = event.detail?.visible ? "block" : "none";
+                    });
+                    virtualKeyboard.addEventListener("geometrychange", function () {
+                      keyboardDock.style.display = virtualKeyboard.visible ? "block" : "none";
+                    });
+                  }
+                }
+                // Keep the built-in shortcuts and add quick entry for the most
+                // common structures students use in their handwritten notes.
+                // Match the EquationBlock shortcut behavior supplied as a reference.
+                field.inlineShortcuts = Object.assign({}, field.inlineShortcuts || {}, {
+               
+             
+                  "^": "^{(#?)}",
+             
+                });
+                field.inlineShortcutTimeout = 1000;
+                field.setAttribute("placeholder", "\\text{Type equation...}");
+                field.mathVirtualKeyboardPolicy = "manual";
+                field.style.minHeight = "40px";
+                field.style.fontFamily = "Quicksand, Inter, system-ui, sans-serif";
                 // Do not reset a field after a student has started typing: MathLive
                 // loads asynchronously, and resetting here used to lose later lines.
                 if (!equationWasEdited && !getEquationLatex(field)) field.value = latex;
@@ -764,6 +794,127 @@
                 body.appendChild(controlsRow);
               }
               renderTable(rows);
+            } else if (type === "sketch") {
+              var sketchState = {
+                strokes: Array.isArray(value?.strokes) ? value.strokes : [],
+                mode: "pencil",
+                currentStroke: null,
+                isDrawing: false
+              };
+              digitxtNoteBlocks[blockId] = sketchState;
+
+              var sketchTools = document.createElement("div");
+              sketchTools.style.display = "flex";
+              sketchTools.style.flexWrap = "wrap";
+              sketchTools.style.alignItems = "center";
+              sketchTools.style.gap = "0.45rem";
+              sketchTools.style.marginBottom = "0.65rem";
+
+              var pencilButton = document.createElement("button");
+              pencilButton.type = "button";
+              pencilButton.textContent = "Draw";
+              stylePanelButton(pencilButton, "#dbeafe", "#1d4ed8");
+              var eraserButton = document.createElement("button");
+              eraserButton.type = "button";
+              eraserButton.textContent = "Eraser";
+              stylePanelButton(eraserButton, "#ffffff", "#475569");
+              var clearSketchButton = document.createElement("button");
+              clearSketchButton.type = "button";
+              clearSketchButton.textContent = "Clear board";
+              stylePanelButton(clearSketchButton, "#fff7ed", "#c2410c");
+              sketchTools.appendChild(pencilButton);
+              sketchTools.appendChild(eraserButton);
+              sketchTools.appendChild(clearSketchButton);
+              body.appendChild(sketchTools);
+
+              var sketchCanvas = document.createElement("canvas");
+              sketchCanvas.width = 700;
+              sketchCanvas.height = 460;
+              sketchCanvas.style.width = "100%";
+              sketchCanvas.style.height = "auto";
+              sketchCanvas.style.display = "block";
+              sketchCanvas.style.background = "#0f2747";
+              sketchCanvas.style.border = "1px solid #1d4ed8";
+              sketchCanvas.style.borderRadius = "0.5rem";
+              sketchCanvas.style.touchAction = "none";
+              body.appendChild(sketchCanvas);
+
+              function renderSketch() {
+                var context = sketchCanvas.getContext("2d");
+                context.clearRect(0, 0, sketchCanvas.width, sketchCanvas.height);
+                context.fillStyle = "#0f2747";
+                context.fillRect(0, 0, sketchCanvas.width, sketchCanvas.height);
+                var strokes = sketchState.currentStroke ? sketchState.strokes.concat([sketchState.currentStroke]) : sketchState.strokes;
+                strokes.forEach(function (stroke) {
+                  if (!stroke?.points?.length) return;
+                  context.beginPath();
+                  context.strokeStyle = stroke.color === "#1e293b" ? "#f8fafc" : (stroke.color || "#f8fafc");
+                  context.lineWidth = stroke.width || 3;
+                  context.lineCap = "round";
+                  context.lineJoin = "round";
+                  context.moveTo(stroke.points[0].x, stroke.points[0].y);
+                  stroke.points.slice(1).forEach(function (point) { context.lineTo(point.x, point.y); });
+                  if (stroke.points.length === 1) context.lineTo(stroke.points[0].x + 0.1, stroke.points[0].y + 0.1);
+                  context.stroke();
+                });
+              }
+
+              function sketchPoint(event) {
+                var rect = sketchCanvas.getBoundingClientRect();
+                return {
+                  x: ((event.clientX - rect.left) / rect.width) * sketchCanvas.width,
+                  y: ((event.clientY - rect.top) / rect.height) * sketchCanvas.height
+                };
+              }
+
+              function setSketchMode(mode) {
+                sketchState.mode = mode;
+                pencilButton.style.background = mode === "pencil" ? "#dbeafe" : "#ffffff";
+                pencilButton.style.color = mode === "pencil" ? "#1d4ed8" : "#475569";
+                eraserButton.style.background = mode === "eraser" ? "#f1f5f9" : "#ffffff";
+                sketchCanvas.style.cursor = mode === "eraser" ? "cell" : "crosshair";
+              }
+              pencilButton.addEventListener("click", function () { setSketchMode("pencil"); });
+              eraserButton.addEventListener("click", function () { setSketchMode("eraser"); });
+              clearSketchButton.addEventListener("click", function () { sketchState.strokes = []; sketchState.currentStroke = null; renderSketch(); });
+              sketchCanvas.addEventListener("pointerdown", function (event) {
+                event.preventDefault();
+                sketchCanvas.setPointerCapture?.(event.pointerId);
+                var point = sketchPoint(event);
+                if (sketchState.mode === "pencil") {
+                  sketchState.isDrawing = true;
+                  sketchState.currentStroke = { color: "#f8fafc", width: 3, points: [point] };
+                } else {
+                  sketchState.isDrawing = true;
+                  sketchState.strokes = sketchState.strokes.filter(function (stroke) {
+                    return !stroke.points?.some(function (savedPoint) { return Math.hypot(savedPoint.x - point.x, savedPoint.y - point.y) < 18; });
+                  });
+                  renderSketch();
+                }
+              });
+              sketchCanvas.addEventListener("pointermove", function (event) {
+                if (!sketchState.isDrawing) return;
+                event.preventDefault();
+                var point = sketchPoint(event);
+                if (sketchState.mode === "pencil") {
+                  sketchState.currentStroke.points.push(point);
+                } else {
+                  sketchState.strokes = sketchState.strokes.filter(function (stroke) {
+                    return !stroke.points?.some(function (savedPoint) { return Math.hypot(savedPoint.x - point.x, savedPoint.y - point.y) < 18; });
+                  });
+                }
+                renderSketch();
+              });
+              function finishSketchPointer() {
+                if (sketchState.currentStroke?.points?.length) sketchState.strokes.push(sketchState.currentStroke);
+                sketchState.isDrawing = false;
+                sketchState.currentStroke = null;
+                renderSketch();
+              }
+              sketchCanvas.addEventListener("pointerup", finishSketchPointer);
+              sketchCanvas.addEventListener("pointercancel", finishSketchPointer);
+              setSketchMode("pencil");
+              renderSketch();
             } else if (type === "graph") {
               var graphSettings = Object.assign({ xMin: -5, xMax: 5, yMin: -10, yMax: 30, xStep: 1, yStep: 5 }, value?.settings || {});
               var graphState = {
@@ -1050,6 +1201,20 @@
               "#digitxt-page-controls { right: calc(var(--digitxt-notes-column-width) + 1rem) !important; }",
               "#digitxt-activity-status { right: calc(var(--digitxt-notes-column-width) + 1rem) !important; }",
               "#digitxt-notes-panel * { box-sizing: border-box; }",
+              "#digitxt-notes-panel { background: #0b1120 !important; border-color: #334155 !important; }",
+              "#digitxt-note-header, #digitxt-note-add-bar { background: #111827 !important; border-color: #334155 !important; }",
+              "#digitxt-note-header strong, #digitxt-note-header span, #digitxt-note-add-bar > span { color: #e2e8f0 !important; }",
+              "#digitxt-note-main { background: #0b1120 !important; }",
+              "#digitxt-note-page { background: #111827 !important; border-color: #334155 !important; box-shadow: none !important; }",
+              "#digitxt-note-title { color: #facc15 !important; background: transparent !important; }",
+              "#digitxt-note-blocks > [data-note-block-id] { background: #1e293b !important; border-color: #334155 !important; box-shadow: none !important; }",
+              "#digitxt-note-blocks [contenteditable] { color: #facc15 !important; }",
+              "#digitxt-note-blocks math-field { color: #facc15 !important; --caret-color: #facc15; --selection-background-color: #713f12; }",
+              "#digitxt-note-blocks input { background: #0f172a !important; color: #facc15 !important; border-color: #475569 !important; }",
+              "#digitxt-note-keyboard-dock { position: relative; display: none; flex: 0 0 auto; height: min(360px, 45vh); min-height: 0; overflow: hidden; border-top: 1px solid #334155; background: #0f172a; }",
+              "#digitxt-note-keyboard-dock > .ML__keyboard { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; z-index: 1 !important; }",
+              "#digitxt-notes-panel math-field::part(virtual-keyboard-toggle) { display: inline-flex !important; visibility: visible !important; opacity: 1 !important; color: #2563eb !important; }",
+              "#mathlive-suggestion-popover, #mathlive-environment-popover { z-index: 2147483647 !important; }",
               "#digitxt-notes-panel [contenteditable]:empty:before { content: attr(data-placeholder); color: #94a3b8; pointer-events: none; display: block; }",
               "#digitxt-notes-panel button:hover { filter: brightness(0.98); }",
               "@media (max-width: 820px) { html body { width: 100vw !important; max-width: 100vw !important; padding-bottom: 55vh !important; } #digitxt-page-controls, #digitxt-activity-status { right: 1rem !important; } #digitxt-notes-panel { top: 45vh !important; left: 0 !important; width: 100vw !important; height: 55vh !important; border-left: 0 !important; border-top: 1px solid #cbd5e1 !important; } #digitxt-notes-resizer { display: none !important; } }",
@@ -1123,7 +1288,7 @@
             panel.style.bottom = "0";
             panel.style.height = "100vh";
             panel.style.maxHeight = "100vh";
-            panel.style.zIndex = "2147483647";
+            panel.style.zIndex = "2147483000";
             panel.style.display = "flex";
             panel.style.flexDirection = "column";
             panel.style.gap = "0";
@@ -1145,6 +1310,7 @@
             });
 
             var header = document.createElement("div");
+            header.id = "digitxt-note-header";
             header.style.display = "flex";
             header.style.alignItems = "center";
             header.style.justifyContent = "space-between";
@@ -1179,11 +1345,7 @@
             headerActions.style.justifyContent = "flex-end";
             headerActions.style.gap = "0.4rem";
 
-            var printButton = document.createElement("button");
-            printButton.type = "button";
-            printButton.textContent = "Print";
-            stylePanelButton(printButton, "#ffffff", "#475569");
-            printButton.addEventListener("click", function () { window.print(); });
+
 
             var clearButton = document.createElement("button");
             clearButton.type = "button";
@@ -1195,7 +1357,7 @@
               }
             });
 
-            headerActions.appendChild(printButton);
+           
             headerActions.appendChild(clearButton);
             header.appendChild(headingGroup);
             header.appendChild(headerActions);
@@ -1208,6 +1370,7 @@
             main.style.padding = "0.85rem";
 
             var page = document.createElement("div");
+            page.id = "digitxt-note-page";
             page.style.background = "#ffffff";
             page.style.border = "1px solid #e6edf5";
             page.style.borderRadius = "0.7rem";
@@ -1237,7 +1400,11 @@
             page.appendChild(blockList);
             main.appendChild(page);
 
+            var keyboardDock = document.createElement("div");
+            keyboardDock.id = "digitxt-note-keyboard-dock";
+
             var addBar = document.createElement("div");
+            addBar.id = "digitxt-note-add-bar";
             addBar.style.display = "flex";
             addBar.style.flexWrap = "wrap";
             addBar.style.justifyContent = "space-between";
@@ -1264,6 +1431,7 @@
               ["Text", "text", "#f1f5f9", "#334155"],
               ["Equation", "equation", "#eff6ff", "#1d4ed8"],
               ["Table", "table", "#ecfdf5", "#047857"],
+              ["Sketch", "sketch", "#eff6ff", "#1d4ed8"],
               ["Graph", "graph", "#faf5ff", "#7e22ce"]
             ].forEach(function (item) {
               var button = document.createElement("button");
@@ -1277,6 +1445,7 @@
 
             panel.appendChild(header);
             panel.appendChild(main);
+            panel.appendChild(keyboardDock);
             panel.appendChild(addBar);
             document.body.appendChild(panel);
             populateNotesPanel(parseNotesDocument());
@@ -1391,7 +1560,7 @@
                 });
                 activityContext.notes = notes;
                 activityContext.activityState = { notes: notes, noteDocument: noteDocument };
-                showStatus("Your notes were saved.", "success");
+                showStatus("Saved.", "success");
               } catch (error) {
                 console.error("Unable to save notes:", error);
                 showStatus(error.message || "Unable to save notes.", "error");
