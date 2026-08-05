@@ -408,36 +408,62 @@ button.style.zIndex = "2147483647";
 
           function loadExternalScript(src) {
             return new Promise(function (resolve) {
+              function finishMathLiveLoad() {
+                if (window.customElements?.whenDefined) {
+                  window.customElements.whenDefined("math-field").then(resolve, resolve);
+                } else {
+                  resolve();
+                }
+              }
+
               var existing = Array.prototype.find.call(document.scripts, function (script) {
                 return script.src === src;
               });
               if (existing) {
-                resolve();
+                // A script element can exist while MathLive is still downloading.
+                // Do not initialize another equation box until the element class is
+                // registered; otherwise its own value property masks MathLive's
+                // live value and typed equations cannot be saved.
+                if (window.customElements?.get?.("math-field")) {
+                  finishMathLiveLoad();
+                } else {
+                  existing.addEventListener("load", finishMathLiveLoad, { once: true });
+                  existing.addEventListener("error", resolve, { once: true });
+                }
                 return;
               }
               var script = document.createElement("script");
               script.src = src;
-              script.onload = resolve;
+              script.onload = finishMathLiveLoad;
               script.onerror = resolve;
               document.head.appendChild(script);
             });
           }
 
-          function parseNotesDocument() {
-            var rawNotes = activityContext.notes || activityContext.activityState?.notes || "";
-            if (activityContext.activityState?.noteDocument) {
-              return activityContext.activityState.noteDocument;
-            }
-            if (rawNotes) {
-              try {
-                var parsed = JSON.parse(rawNotes);
-                if (parsed && parsed.type === "digitxt-note-document" && Array.isArray(parsed.blocks)) {
-                  return parsed;
-                }
-              } catch (error) {
-                // Plain legacy notes are converted below.
+          function parseNoteDocument(value) {
+            if (!value) return null;
+            try {
+              var parsed = typeof value === "string" ? JSON.parse(value) : value;
+              if (parsed && parsed.type === "digitxt-note-document" && Array.isArray(parsed.blocks)) {
+                return parsed;
               }
+            } catch (error) {
+              // Plain legacy notes are handled by the caller.
             }
+            return null;
+          }
+
+          function parseNotesDocument() {
+            // The content field is the complete, serialized note document. Prefer it over
+            // the convenience copy in activityState, which can be stale in saves
+            // created by older versions of the notes editor.
+            var rawNotes = activityContext.notes || activityContext.activityState?.notes || "";
+            var savedDocument = parseNoteDocument(rawNotes);
+            if (savedDocument) return savedDocument;
+
+            var stateDocument = parseNoteDocument(activityContext.activityState?.noteDocument);
+            if (stateDocument) return stateDocument;
+
             return {
               type: "digitxt-note-document",
               version: 1,
@@ -558,7 +584,7 @@ button.style.zIndex = "2147483647";
                 blocks.push({ type: "text", html: block.querySelector("[contenteditable]")?.innerHTML || "" });
               } else if (type === "equation") {
                 var field = block.querySelector("math-field");
-                var latex = getEquationLatex(field) || digitxtNoteBlocks[blockId]?.latex || "";
+                var latex = getEquationLatex(field) || field?.getAttribute("data-latex") || digitxtNoteBlocks[blockId]?.latex || "";
                 if (digitxtNoteBlocks[blockId]) digitxtNoteBlocks[blockId].latex = latex;
                 blocks.push({ type: "equation", latex: latex });
               } else if (type === "table") {
@@ -588,15 +614,19 @@ button.style.zIndex = "2147483647";
 
           function getEquationLatex(field) {
             if (!field) return "";
-            // The value property is MathLive's live LaTeX value once the custom element is
-            // upgraded. Prefer it so the exact text a student just typed is saved.
-            if (typeof field.value === "string" && field.value) return field.value;
+            // MathLive's getValue("latex") is the authoritative value. The value
+            // property can briefly hold the initial value while a math-field is
+            // upgrading, which caused later equation entries to be saved as blank.
             try {
-              if (typeof field.getValue === "function") return String(field.getValue() || "");
+              if (typeof field.getValue === "function") {
+                var liveLatex = field.getValue("latex");
+                if (liveLatex) return String(liveLatex);
+              }
             } catch (error) {
-              // Fall back to the field value while MathLive is still loading.
+              // Fall back to the values available while MathLive is loading.
             }
-            return String(field.value || field.textContent || "");
+            if (typeof field.value === "string" && field.value) return field.value;
+            return String(field.getAttribute("data-latex") || field.textContent || "");
           }
 
           function serializeNotesForSave() {
@@ -672,6 +702,7 @@ button.style.zIndex = "2147483647";
               digitxtNoteBlocks[blockId] = { latex: latex };
               
               field.value = latex;
+              field.setAttribute("data-latex", latex);
               field.style.width = "100%";
               field.style.fontSize = "1.25rem";
               field.style.border = "0";
@@ -680,11 +711,16 @@ button.style.zIndex = "2147483647";
               field.mathVirtualKeyboardPolicy = "manual";
               function captureEquationValue() {
                 equationWasEdited = true;
-                digitxtNoteBlocks[blockId].latex = getEquationLatex(field);
+                var currentLatex = getEquationLatex(field);
+                if (currentLatex) {
+                  digitxtNoteBlocks[blockId].latex = currentLatex;
+                  field.setAttribute("data-latex", currentLatex);
+                }
               }
               field.addEventListener("input", captureEquationValue);
               field.addEventListener("change", captureEquationValue);
               field.addEventListener("blur", captureEquationValue);
+              field.addEventListener("keyup", captureEquationValue);
               field.addEventListener("keydown", function (event) {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -701,6 +737,7 @@ button.style.zIndex = "2147483647";
                 if (Object.prototype.hasOwnProperty.call(field, "value")) delete field.value;
                 field.value = pendingLatex;
                 digitxtNoteBlocks[blockId].latex = field.value || pendingLatex;
+                field.setAttribute("data-latex", digitxtNoteBlocks[blockId].latex || "");
                 // MathLive has one shared virtual keyboard. Attach it to the notes
                 // panel (not document.body), so its absolute positioning is scoped
                 // to the student's writing column rather than the HTML preview.
@@ -738,6 +775,7 @@ button.style.zIndex = "2147483647";
                 // loads asynchronously, and resetting here used to lose later lines.
                 if (!equationWasEdited && !getEquationLatex(field)) field.value = latex;
                 digitxtNoteBlocks[blockId].latex = getEquationLatex(field);
+                field.setAttribute("data-latex", digitxtNoteBlocks[blockId].latex || "");
                 setTimeout(function () { if (!equationWasEdited && field.focus) field.focus(); }, 0);
               });
             } else if (type === "table") {
@@ -1565,7 +1603,10 @@ button.style.zIndex = "2147483647";
                     username: currentUser.username,
                     savedFrom: "math-note-editor",
                     noteOnly: true,
-                    chapterSavedAt: activityContext.chapterSavedAt
+                    chapterSavedAt: activityContext.chapterSavedAt,
+                    // Keep a recovery copy for notes saved while an older client
+                    // is still reading activityState instead of content.
+                    noteDocument: noteDocument
                   }
                 });
                 activityContext.notes = notes;
